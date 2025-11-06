@@ -50,8 +50,8 @@ class AggressiveThreeMinScalpingBot:
         self.thailand_tz = pytz.timezone('Asia/Bangkok')
         
         # AGGRESSIVE 3MIN SCALPING PARAMETERS
-        self.trade_size_usd = 100  # Increased size for aggressive trading
-        self.leverage = 10  # Higher leverage
+        self.trade_size_usd = 50  # Increased size for aggressive trading
+        self.leverage = 5  # Higher leverage
         self.tp_percent = 0.012   # +1.2% - More aggressive TP
         self.sl_percent = 0.008   # -0.8% - Tighter SL
         
