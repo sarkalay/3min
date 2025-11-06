@@ -73,6 +73,7 @@ class AggressiveThreeMinScalpingBot:
             self.binance = Client(self.binance_api_key, self.binance_secret)
             self.print_color("FULL AI CONTROL 3MIN SCALPING BOT ACTIVATED!", self.Fore.RED + self.Style.BRIGHT)
             self.print_color("AI DECIDES: Entry, TP, SL | FIXED: $50 | 5x | SOL XRP LINK DOGE SUI", self.Fore.CYAN + self.Style.BRIGHT)
+            self.print_color("AI NOW USES 3M + 15M + 1H + 4H CONTEXT AUTOMATICALLY", self.Fore.MAGENTA + self.Style.BRIGHT)
         except Exception as e:
             self.print_color(f"Binance initialization failed: {e}", self.Fore.RED)
             self.binance = None
@@ -256,17 +257,53 @@ class AggressiveThreeMinScalpingBot:
             self.print_color(f"AI response parsing failed: {e}", self.Fore.RED)
             return 'HOLD', None, None, None, 50, 'Parsing failed'
 
-    def get_deepseek_analysis(self, pair, market_data):
+    def get_multi_timeframe_data(self, pair):
+        data = {}
+        timeframes = [
+            ('3m', 15), ('15m', 12), ('1h', 10), ('4h', 8)
+        ]
+        for tf, limit in timeframes:
+            try:
+                klines = self.binance.futures_klines(symbol=pair, interval=tf, limit=limit) if self.binance else []
+                if not klines:
+                    klines = [[0]*6 for _ in range(limit)]
+                
+                closes = [float(k[4]) for k in klines]
+                highs = [float(k[2]) for k in klines]
+                lows = [float(k[3]) for k in klines]
+                volumes = [float(k[5]) for k in klines]
+                
+                current = closes[-1]
+                change_5 = ((current - closes[-6]) / closes[-6] * 100) if len(closes) >= 6 else 0
+                trend = "BULLISH" if current > closes[-3] else "BEARISH" if current < closes[-3] else "SIDEWAYS"
+                
+                data[tf] = {
+                    'current_price': current,
+                    'price_change_5p': change_5,
+                    'trend': trend,
+                    'highs_last_5': highs[-5:],
+                    'lows_last_5': lows[-5:],
+                    'volume_change': ((volumes[-1] - volumes[-6]) / volumes[-6] * 100) if len(volumes) >= 6 and volumes[-6] > 0 else 0
+                }
+            except:
+                data[tf] = {
+                    'current_price': self.get_current_price(pair),
+                    'price_change_5p': 0,
+                    'trend': 'UNKNOWN',
+                    'highs_last_5': [],
+                    'lows_last_5': [],
+                    'volume_change': 0
+                }
+        return data
+
+    def get_deepseek_analysis(self, pair, mtf_data):
         try:
             if not self.openrouter_key:
                 self.print_color("OpenRouter API key not found", self.Fore.RED)
                 return "HOLD", None, None, None, 0, "No API key"
             
-            current_price = market_data['current_price']
-            price_change = market_data.get('price_change', 0)
-            volume_change = market_data.get('volume_change', 0)
+            current_price = mtf_data['3m']['current_price']
             
-            # FULL AI CONTROL - FIXED $50 & 5x
             prompt = f"""
 <|system|>
 You are DeepSeek V3.1 in FULL AUTHORIZATION MODE.
@@ -283,24 +320,29 @@ You decide:
 - Confidence (0-100)
 
 Only trade if confidence >= 80%. Return PERFECT JSON only.
+
+YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
+- Use 1H/4H for trend confirmation
+- Use 15M for support/resistance
+- Only take 3M signals that align with 1H trend
+- Avoid counter-trend trades unless strong reversal
 </|system|>
 
 <|user|>
 **FULL AI CONTROL 3-MINUTE SCALPING for {pair}**
 
-**MARKET DATA:**
-- Current Price: ${current_price:.6f}
-- 15min Price Change: {price_change:.2f}%
-- 15min Volume Change: {volume_change:.2f}%
-- Recent Prices (last 8): {market_data.get('prices', [])[-8:]}
-- Highs (last 5): {market_data.get('highs', [])[-5:]}
-- Lows (last 5): {market_data.get('lows', [])[-5:]}
+**MULTI-TIMEFRAME DATA:**
+- 3M: Price ${current_price:.6f} | Change: {mtf_data['3m']['price_change_5p']:.2f}% | Trend: {mtf_data['3m']['trend']}
+- 15M: Trend: {mtf_data['15m']['trend']} | S/R: Highs {mtf_data['15m']['highs_last_5']} | Lows {mtf_data['15m']['lows_last_5']}
+- 1H: Trend: {mtf_data['1h']['trend']} | Change: {mtf_data['1h']['price_change_5p']:.2f}%
+- 4H: Trend: {mtf_data['4h']['trend']} | Major level context
 
 **YOU DECIDE:**
-1. Analyze momentum, volume, patterns
-2. Calculate exact entry, TP, SL
-3. Use $50 and 5x leverage → quantity = (50 * 5) / entry_price
-4. Only trade if confidence >= 80%
+1. Analyze 3M momentum + volume
+2. Confirm with 1H trend
+3. Use 15M S/R for entry/TP/SL
+4. Calculate quantity = (50 * 5) / entry_price
+5. Only trade if 1H trend aligns and confidence >= 80%
 
 **RETURN ONLY THIS JSON:**
 ```json
@@ -330,7 +372,7 @@ Only trade if confidence >= 80%. Return PERFECT JSON only.
                 "top_p": 0.9
             }
             
-            self.print_color(f"AI Analyzing {pair}...", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.print_color(f"AI Analyzing {pair} with 3M+15M+1H+4H...", self.Fore.MAGENTA + self.Style.BRIGHT)
             response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=40)
             
             if response.status_code == 200:
@@ -362,81 +404,6 @@ Only trade if confidence >= 80%. Return PERFECT JSON only.
         except Exception as e:
             self.print_color(f"AI analysis failed: {e}", self.Fore.RED)
             return "HOLD", None, None, None, 0, "Error"
-
-    def get_price_history(self, pair, limit=15):
-        try:
-            if self.binance:
-                klines = self.binance.futures_klines(symbol=pair, interval=Client.KLINE_INTERVAL_3MINUTE, limit=limit)
-                prices = [float(k[4]) for k in klines]
-                highs =  [float(k[2]) for k in klines]
-                lows =   [float(k[3]) for k in klines]
-                volumes = [float(k[5]) for k in klines]
-                
-                current_price = prices[-1] if prices else 0
-                price_change = ((current_price - prices[-6]) / prices[-6] * 100) if len(prices) >= 6 else 0
-                volume_change = ((volumes[-1] - volumes[-6]) / volumes[-6] * 100) if len(volumes) >= 6 else 0
-                
-                return {
-                    'prices': prices, 
-                    'highs': highs,
-                    'lows': lows,
-                    'volumes': volumes,
-                    'current_price': current_price,
-                    'price_change': price_change,
-                    'volume_change': volume_change
-                }
-            else:
-                current_price = self.get_current_price(pair)
-                return {
-                    'prices': [current_price] * 10, 
-                    'highs': [current_price * 1.01] * 10,
-                    'lows': [current_price * 0.99] * 10,
-                    'volumes': [100000] * 10,
-                    'current_price': current_price,
-                    'price_change': 0.5,
-                    'volume_change': 10.2
-                }
-        except Exception as e:
-            current_price = self.get_current_price(pair)
-            return {
-                'prices': [current_price] * 10,
-                'highs': [current_price * 1.01] * 10,
-                'lows': [current_price * 0.99] * 10,
-                'volumes': [100000] * 10,
-                'current_price': current_price,
-                'price_change': 0.5,
-                'volume_change': 10.2
-            }
-
-    def get_ai_decision(self, pair_data):
-        try:
-            pair = list(pair_data.keys())[0]
-            current_price = pair_data[pair]['price']
-            if current_price <= 0:
-                return {"action": "HOLD", "confidence": 0}
-            
-            market_data = self.get_price_history(pair)
-            market_data['current_price'] = current_price
-            
-            direction, entry_price, take_profit, stop_loss, quantity, confidence, reason = self.get_deepseek_analysis(pair, market_data)
-            
-            if direction == "HOLD" or confidence < 80:
-                return {"action": "HOLD", "confidence": confidence}
-            else:
-                return {
-                    "action": "TRADE",
-                    "pair": pair,
-                    "direction": direction,
-                    "entry_price": entry_price,
-                    "take_profit": take_profit,
-                    "stop_loss": stop_loss,
-                    "quantity": quantity,
-                    "confidence": confidence,
-                    "reason": reason
-                }
-        except Exception as e:
-            self.print_color(f"AI decision failed: {e}", self.Fore.RED)
-            return {"action": "HOLD", "confidence": 0}
 
     def get_current_price(self, pair):
         try:
@@ -671,6 +638,35 @@ Only trade if confidence >= 80%. Return PERFECT JSON only.
             total_color = self.Fore.GREEN + self.Style.BRIGHT if total_unrealized >= 0 else self.Fore.RED + self.Style.BRIGHT
             self.print_color(f"Active: {active_count} | Unrealized P&L: ${total_unrealized:.2f}", total_color)
 
+    def get_ai_decision(self, pair_data):
+        try:
+            pair = list(pair_data.keys())[0]
+            current_price = pair_data[pair]['price']
+            if current_price <= 0:
+                return {"action": "HOLD", "confidence": 0}
+            
+            mtf_data = self.get_multi_timeframe_data(pair)
+            
+            direction, entry_price, take_profit, stop_loss, quantity, confidence, reason = self.get_deepseek_analysis(pair, mtf_data)
+            
+            if direction == "HOLD" or confidence < 80:
+                return {"action": "HOLD", "confidence": confidence}
+            else:
+                return {
+                    "action": "TRADE",
+                    "pair": pair,
+                    "direction": direction,
+                    "entry_price": entry_price,
+                    "take_profit": take_profit,
+                    "stop_loss": stop_loss,
+                    "quantity": quantity,
+                    "confidence": confidence,
+                    "reason": reason
+                }
+        except Exception as e:
+            self.print_color(f"AI decision failed: {e}", self.Fore.RED)
+            return {"action": "HOLD", "confidence": 0}
+
     def run_trading_cycle(self):
         try:
             closed_trades = self.monitor_positions()
@@ -711,6 +707,7 @@ Only trade if confidence >= 80%. Return PERFECT JSON only.
     def start_trading(self):
         self.print_color("FULL AI CONTROL BOT STARTED!", self.Fore.RED + self.Style.BRIGHT)
         self.print_color("FIXED: $50 | 5x | SOL XRP LINK DOGE SUI", self.Fore.CYAN + self.Style.BRIGHT)
+        self.print_color("AI USES 3M + 15M + 1H + 4H CONTEXT", self.Fore.MAGENTA + self.Style.BRIGHT)
         self.cycle_count = 0
         
         while True:
@@ -745,7 +742,7 @@ class AggressiveThreeMinPaperTradingBot:
         
         self.real_bot.print_color("PAPER TRADING MODE ACTIVATED", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color(f"Starting Balance: ${self.paper_balance}", self.Fore.CYAN + self.Style.BRIGHT)
-        self.real_bot.print_color("AI FULL CONTROL - $50 | 5x | SOL XRP LINK DOGE SUI", self.Fore.CYAN + self.Style.BRIGHT)
+        self.real_bot.print_color("AI FULL CONTROL - $50 | 5x | MULTI-TIMEFRAME", self.Fore.CYAN + self.Style.BRIGHT)
     
     def paper_execute_trade(self, decision):
         try:
@@ -878,6 +875,7 @@ if __name__ == "__main__":
         
         print("\n" + "="*80)
         print("AGGRESSIVE 3MIN AI SCALPING BOT - DEEPSEEK V3.1")
+        print("MULTI-TIMEFRAME CONTEXT ENABLED: 3M + 15M + 1H + 4H")
         print("="*80)
         print("SELECT MODE:")
         print("1. Live Trading ($50 | 5x | Real Money)")
