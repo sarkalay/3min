@@ -374,7 +374,7 @@ class Aggressive15MinScalpingBot:
             }
             
             data = {
-                "model": "qwen/qwen-3-max",
+                "model": "qwen/qwen3-max",
                 "messages": [
                     {"role": "system", "content": "You are an AGGRESSIVE 15-minute scalper with deep thinking capabilities. Analyze 15min market data thoroughly and take calculated risks. Return perfect JSON only with TP/SL. Think step by step before making decisions."},
                     {"role": "user", "content": prompt}
