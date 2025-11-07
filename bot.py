@@ -30,7 +30,7 @@ if not COLORAMA_AVAILABLE:
     Back = DummyColors() 
     Style = DummyColors()
 
-class AggressiveThreeMinScalpingBot:
+class AggressiveFifteenMinScalpingBot:
     def __init__(self):
         # Load config from .env file
         self.binance_api_key = os.getenv('BINANCE_API_KEY')
@@ -56,7 +56,7 @@ class AggressiveThreeMinScalpingBot:
         self.bot_opened_trades = {}
         
         # Trade history
-        self.trade_history_file = "aggressive_3min_scalping_history.json"
+        self.trade_history_file = "aggressive_15min_scalping_history.json"
         self.trade_history = self.load_trade_history()
         
         # Precision settings
@@ -71,9 +71,9 @@ class AggressiveThreeMinScalpingBot:
         # Initialize Binance client
         try:
             self.binance = Client(self.binance_api_key, self.binance_secret)
-            self.print_color("FULL AI CONTROL 3MIN SCALPING BOT ACTIVATED!", self.Fore.RED + self.Style.BRIGHT)
+            self.print_color("FULL AI CONTROL 15MIN SCALPING BOT ACTIVATED!", self.Fore.RED + self.Style.BRIGHT)
             self.print_color("AI DECIDES: Entry, TP, SL | FIXED: $50 | 5x | SOL XRP LINK DOGE SUI", self.Fore.CYAN + self.Style.BRIGHT)
-            self.print_color("AI NOW USES 3M + 15M + 1H + 4H CONTEXT AUTOMATICALLY", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.print_color("AI USES 15M + 1H + 4H CONTEXT AUTOMATICALLY", self.Fore.MAGENTA + self.Style.BRIGHT)
         except Exception as e:
             self.print_color(f"Binance initialization failed: {e}", self.Fore.RED)
             self.binance = None
@@ -97,6 +97,7 @@ class AggressiveThreeMinScalpingBot:
         try:
             with open(self.trade_history_file, 'w') as f:
                 json.dump(self.trade_history, f, indent=2)
+            self.print_color(f"History saved to {self.trade_history_file}", self.Fore.CYAN)
         except Exception as e:
             self.print_color(f"Error saving trade history: {e}", self.Fore.RED)
     
@@ -260,7 +261,7 @@ class AggressiveThreeMinScalpingBot:
     def get_multi_timeframe_data(self, pair):
         data = {}
         timeframes = [
-            ('3m', 15), ('15m', 12), ('1h', 10), ('4h', 8)
+            ('15m', 15), ('1h', 10), ('4h', 8)
         ]
         for tf, limit in timeframes:
             try:
@@ -302,7 +303,7 @@ class AggressiveThreeMinScalpingBot:
                 self.print_color("OpenRouter API key not found", self.Fore.RED)
                 return "HOLD", None, None, None, 0, "No API key"
             
-            current_price = mtf_data['3m']['current_price']
+            current_price = mtf_data['15m']['current_price']
             
             prompt = f"""
 <|system|>
@@ -323,26 +324,23 @@ Only trade if confidence >= 80%. Return PERFECT JSON only.
 
 YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
 - Use 1H/4H for trend confirmation
-- Use 15M for support/resistance
-- Only take 3M signals that align with 1H trend
+- Only take 15M signals that align with 1H trend
 - Avoid counter-trend trades unless strong reversal
 </|system|>
 
 <|user|>
-**FULL AI CONTROL 3-MINUTE SCALPING for {pair}**
+**FULL AI CONTROL 15-MINUTE SCALPING for {pair}**
 
 **MULTI-TIMEFRAME DATA:**
-- 3M: Price ${current_price:.6f} | Change: {mtf_data['3m']['price_change_5p']:.2f}% | Trend: {mtf_data['3m']['trend']}
-- 15M: Trend: {mtf_data['15m']['trend']} | S/R: Highs {mtf_data['15m']['highs_last_5']} | Lows {mtf_data['15m']['lows_last_5']}
+- 15M: Price ${current_price:.6f} | Change: {mtf_data['15m']['price_change_5p']:.2f}% | Trend: {mtf_data['15m']['trend']}
 - 1H: Trend: {mtf_data['1h']['trend']} | Change: {mtf_data['1h']['price_change_5p']:.2f}%
 - 4H: Trend: {mtf_data['4h']['trend']} | Major level context
 
 **YOU DECIDE:**
-1. Analyze 3M momentum + volume
+1. Analyze 15M momentum + volume
 2. Confirm with 1H trend
-3. Use 15M S/R for entry/TP/SL
-4. Calculate quantity = (50 * 5) / entry_price
-5. Only trade if 1H trend aligns and confidence >= 80%
+3. Calculate quantity = (50 * 5) / entry_price
+4. Only trade if 1H trend aligns and confidence >= 80%
 
 **RETURN ONLY THIS JSON:**
 ```json
@@ -372,7 +370,7 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                 "top_p": 0.9
             }
             
-            self.print_color(f"AI Analyzing {pair} with 3M+15M+1H+4H...", self.Fore.MAGENTA + self.Style.BRIGHT)
+                        self.print_color(f"AI Analyzing {pair} with 15M+1H+4H...", self.Fore.MAGENTA + self.Style.BRIGHT)
             response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=40)
             
             if response.status_code == 200:
@@ -705,9 +703,9 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
             self.print_color(f"Cycle error: {e}", self.Fore.RED)
 
     def start_trading(self):
-        self.print_color("FULL AI CONTROL BOT STARTED!", self.Fore.RED + self.Style.BRIGHT)
+        self.print_color("FULL AI CONTROL 15MIN BOT STARTED!", self.Fore.RED + self.Style.BRIGHT)
         self.print_color("FIXED: $50 | 5x | SOL XRP LINK DOGE SUI", self.Fore.CYAN + self.Style.BRIGHT)
-        self.print_color("AI USES 3M + 15M + 1H + 4H CONTEXT", self.Fore.MAGENTA + self.Style.BRIGHT)
+        self.print_color("AI USES 15M + 1H + 4H CONTEXT", self.Fore.MAGENTA + self.Style.BRIGHT)
         self.cycle_count = 0
         
         while True:
@@ -716,8 +714,8 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                 self.print_color(f"\nAI CYCLE {self.cycle_count}", self.Fore.RED + self.Style.BRIGHT)
                 self.print_color("=" * 60, self.Fore.RED)
                 self.run_trading_cycle()
-                self.print_color(f"Waiting 25s...", self.Fore.BLUE)
-                time.sleep(25)
+                self.print_color(f"Waiting 3min...", self.Fore.BLUE)
+                time.sleep(180)  # 15m timeframe → 3min cycle
                 
             except KeyboardInterrupt:
                 self.print_color(f"\nAI BOT STOPPED", self.Fore.RED + self.Style.BRIGHT)
@@ -726,10 +724,10 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                 break
             except Exception as e:
                 self.print_color(f"Error: {e}", self.Fore.RED)
-                time.sleep(25)
+                time.sleep(180)
 
 
-class AggressiveThreeMinPaperTradingBot:
+class AggressiveFifteenMinPaperTradingBot:
     def __init__(self, real_bot):
         self.real_bot = real_bot
         self.Fore = real_bot.Fore
@@ -739,11 +737,45 @@ class AggressiveThreeMinPaperTradingBot:
         self.paper_balance = 5000
         self.paper_positions = {}
         self.paper_history = []
+        self.paper_history_file = "paper_15min_trading_history.json"
+        
+        # Load existing paper history
+        self.paper_history = self.load_paper_history()
         
         self.real_bot.print_color("PAPER TRADING MODE ACTIVATED", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color(f"Starting Balance: ${self.paper_balance}", self.Fore.CYAN + self.Style.BRIGHT)
-        self.real_bot.print_color("AI FULL CONTROL - $50 | 5x | MULTI-TIMEFRAME", self.Fore.CYAN + self.Style.BRIGHT)
+        self.real_bot.print_color("AI FULL CONTROL - $50 | 5x | 15MIN TIMEFRAME", self.Fore.CYAN + self.Style.BRIGHT)
     
+    def load_paper_history(self):
+        try:
+            if os.path.exists(self.paper_history_file):
+                with open(self.paper_history_file, 'r') as f:
+                    return json.load(f)
+            return []
+        except Exception as e:
+            self.real_bot.print_color(f"Paper history load error: {e}", self.Fore.RED)
+            return []
+
+    def save_paper_history(self):
+        try:
+            with open(self.paper_history_file, 'w') as f:
+                json.dump(self.paper_history, f, indent=2)
+            self.real_bot.print_color(f"Paper history saved to {self.paper_history_file}", self.Fore.CYAN)
+        except Exception as e:
+            self.real_bot.print_color(f"Paper history save error: {e}", self.Fore.RED)
+
+    def add_paper_trade_to_history(self, trade_data):
+        try:
+            trade_data['close_time'] = self.real_bot.get_thailand_time()
+            trade_data['close_timestamp'] = time.time()
+            self.paper_history.append(trade_data)
+            if len(self.paper_history) > 200:
+                self.paper_history = self.paper_history[-200:]
+            self.save_paper_history()
+            self.real_bot.print_color(f"PAPER TRADE SAVED: {trade_data['pair']} {trade_data['direction']} P&L: ${trade_data.get('pnl', 0):.2f}", self.Fore.CYAN)
+        except Exception as e:
+            self.real_bot.print_color(f"Paper history add error: {e}", self.Fore.RED)
+
     def paper_execute_trade(self, decision):
         try:
             pair = decision["pair"]
@@ -824,7 +856,7 @@ class AggressiveThreeMinPaperTradingBot:
                     trade['close_time'] = self.real_bot.get_thailand_time()
                     
                     self.paper_balance += pnl
-                    self.paper_history.append(trade.copy())
+                    self.add_paper_trade_to_history(trade.copy())  # Auto save to JSON
                     closed.append(pair)
                     
                     pnl_color = self.Fore.GREEN + self.Style.BRIGHT if pnl > 0 else self.Fore.RED + self.Style.BRIGHT
@@ -856,14 +888,14 @@ class AggressiveThreeMinPaperTradingBot:
             self.real_bot.print_color(f"Paper cycle error: {e}", self.Fore.RED)
 
     def start_paper_trading(self):
-        self.real_bot.print_color("PAPER TRADING STARTED!", self.Fore.GREEN + self.Style.BRIGHT)
+        self.real_bot.print_color("PAPER 15MIN TRADING STARTED!", self.Fore.GREEN + self.Style.BRIGHT)
         cycle = 0
         while True:
             try:
                 cycle += 1
                 self.real_bot.print_color(f"\nPAPER CYCLE {cycle}", self.Fore.GREEN + self.Style.BRIGHT)
                 self.run_paper_cycle()
-                time.sleep(25)
+                time.sleep(180)  # 3min cycle for 15min chart
             except KeyboardInterrupt:
                 self.real_bot.print_color("PAPER TRADING STOPPED", self.Fore.YELLOW)
                 break
@@ -871,11 +903,11 @@ class AggressiveThreeMinPaperTradingBot:
 
 if __name__ == "__main__":
     try:
-        bot = AggressiveThreeMinScalpingBot()
+        bot = AggressiveFifteenMinScalpingBot()
         
         print("\n" + "="*80)
-        print("AGGRESSIVE 3MIN AI SCALPING BOT - DEEPSEEK V3.1")
-        print("MULTI-TIMEFRAME CONTEXT ENABLED: 3M + 15M + 1H + 4H")
+        print("AGGRESSIVE 15MIN AI SCALPING BOT - DEEPSEEK V3.1")
+        print("MULTI-TIMEFRAME: 15M + 1H + 4H | PAPER HISTORY FIXED")
         print("="*80)
         print("SELECT MODE:")
         print("1. Live Trading ($50 | 5x | Real Money)")
@@ -890,7 +922,7 @@ if __name__ == "__main__":
             else:
                 print("Cancelled.")
         else:
-            paper_bot = AggressiveThreeMinPaperTradingBot(bot)
+            paper_bot = AggressiveFifteenMinPaperTradingBot(bot)
             paper_bot.start_paper_trading()
             
     except Exception as e:
