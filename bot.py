@@ -84,7 +84,7 @@ class Aggressive15MinScalpingBot:
             self.print_color(f"💰 Trade Size: ${self.trade_size_usd} | Leverage: {self.leverage}x", self.Fore.YELLOW + self.Style.BRIGHT)
             self.print_color(f"⏰ Chart: 15MIN | Max Trades: {self.max_concurrent_trades}", self.Fore.MAGENTA + self.Style.BRIGHT)
             self.print_color(f"🎲 Pairs: {len(self.available_pairs)}", self.Fore.CYAN + self.Style.BRIGHT)
-            self.print_color(f"🤖 AI Model: Qwen2.5 72B (via OpenRouter)", self.Fore.BLUE + self.Style.BRIGHT)
+            self.print_color(f"🤖 AI Model: Qwen3 Max (via OpenRouter)", self.Fore.BLUE + self.Style.BRIGHT)
         except Exception as e:
             self.print_color(f"Binance initialization failed: {e}", self.Fore.RED)
             # Create dummy client for paper trading
@@ -318,7 +318,7 @@ class Aggressive15MinScalpingBot:
             self.print_color(f"AI response parsing failed: {e}", self.Fore.RED)
             return 'HOLD', None, 50, 'Parsing failed', None, None
 
-    def get_qwen_analysis(self, pair, market_data):
+    def get_qwen3_max_analysis(self, pair, market_data):
         try:
             if not self.openrouter_key:
                 self.print_color("OpenRouter API key not found", self.Fore.RED)
@@ -374,7 +374,7 @@ class Aggressive15MinScalpingBot:
             }
             
             data = {
-                "model": "qwen/qwen-2.5-72b-instruct:free",  # Free and powerful model
+                "model": "qwen/qwen-3-max",
                 "messages": [
                     {"role": "system", "content": "You are an AGGRESSIVE 15-minute scalper with deep thinking capabilities. Analyze 15min market data thoroughly and take calculated risks. Return perfect JSON only with TP/SL. Think step by step before making decisions."},
                     {"role": "user", "content": prompt}
@@ -383,7 +383,7 @@ class Aggressive15MinScalpingBot:
                 "max_tokens": 500
             }
             
-            self.print_color(f"🤖 Qwen2.5 72B Analyzing {pair} for AGGRESSIVE 15min entries...", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.print_color(f"🤖 Qwen3 Max Analyzing {pair} for AGGRESSIVE 15min entries...", self.Fore.MAGENTA + self.Style.BRIGHT)
             response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=45)
             
             if response.status_code == 200:
@@ -401,11 +401,11 @@ class Aggressive15MinScalpingBot:
                 self.print_color(f"   Reason: {reason}", self.Fore.YELLOW)
                 return direction, entry_price, confidence, reason, take_profit, stop_loss
             else:
-                self.print_color(f"Qwen API error: {response.status_code} - {response.text}", self.Fore.RED)
+                self.print_color(f"Qwen3 Max API error: {response.status_code} - {response.text}", self.Fore.RED)
                 return "HOLD", None, 0, f"API Error", None, None
                 
         except Exception as e:
-            self.print_color(f"Qwen analysis failed: {e}", self.Fore.RED)
+            self.print_color(f"Qwen3 Max analysis failed: {e}", self.Fore.RED)
             return "HOLD", None, 0, f"Error", None, None
 
     def get_price_history(self, pair, limit=15):
@@ -466,7 +466,7 @@ class Aggressive15MinScalpingBot:
             market_data = self.get_price_history(pair)
             market_data['current_price'] = current_price
             
-            direction, entry_price, confidence, reason, take_profit, stop_loss = self.get_qwen_analysis(pair, market_data)
+            direction, entry_price, confidence, reason, take_profit, stop_loss = self.get_qwen3_max_analysis(pair, market_data)
             
             if direction == "HOLD" or confidence < 75:  # Higher confidence threshold for 15min
                 self.print_color(f"🟡 HOLD {pair} ({confidence}% confidence)", self.Fore.YELLOW)
@@ -805,7 +805,7 @@ class Aggressive15MinScalpingBot:
     def start_trading(self):
         self.print_color("🔥 STARTING AGGRESSIVE 15MIN LIVE TRADING BOT!", self.Fore.RED + self.Style.BRIGHT)
         self.print_color("⚠️  REAL MONEY TRADING - HIGH RISK! ⚠️", self.Fore.RED + self.Style.BRIGHT)
-        self.print_color("🤖 Qwen2.5 72B AI FULLY CONTROLS: Entry, TP, SL, Direction", self.Fore.CYAN + self.Style.BRIGHT)
+        self.print_color("🤖 Qwen3 Max AI FULLY CONTROLS: Entry, TP, SL, Direction", self.Fore.CYAN + self.Style.BRIGHT)
         self.print_color("💾 REAL trades saved to: aggressive_15min_scalping_real_history.json", self.Fore.GREEN)
         self.cycle_count = 0
         
@@ -845,7 +845,7 @@ class Aggressive15MinPaperTradingBot:
         self.real_bot.print_color("🔥 AGGRESSIVE 15MIN PAPER TRADING BOT INITIALIZED!", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color(f"💰 Starting Paper Balance: ${self.paper_balance}", self.Fore.CYAN + self.Style.BRIGHT)
         self.real_bot.print_color(f"🎯 Strategy: AGGRESSIVE 15MIN Scalping | TP: +1.2% | SL: -0.8%", self.Fore.MAGENTA + self.Style.BRIGHT)
-        self.real_bot.print_color(f"🤖 Qwen2.5 72B AI Full Control: Entry, TP, SL, Direction", self.Fore.CYAN + self.Style.BRIGHT)
+        self.real_bot.print_color(f"🤖 Qwen3 Max AI Full Control: Entry, TP, SL, Direction", self.Fore.CYAN + self.Style.BRIGHT)
         self.real_bot.print_color(f"💾 Paper trades saved to: {self.paper_history_file}", self.Fore.GREEN)
         
     def load_paper_history(self):
@@ -1073,7 +1073,7 @@ class Aggressive15MinPaperTradingBot:
     def start_paper_trading(self):
         self.real_bot.print_color("🔥 STARTING AGGRESSIVE 15MIN PAPER TRADING!", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color("💸 NO REAL MONEY AT RISK", self.Fore.GREEN)
-        self.real_bot.print_color("🤖 Qwen2.5 72B AI Full Control: Entry, TP, SL, Direction", self.Fore.CYAN)
+        self.real_bot.print_color("🤖 Qwen3 Max AI Full Control: Entry, TP, SL, Direction", self.Fore.CYAN)
         
         self.paper_cycle_count = 0
         while True:
@@ -1122,7 +1122,7 @@ if __name__ == "__main__":
         
         if choice == "1":
             print("⚠️  WARNING: REAL MONEY TRADING! HIGH RISK! ⚠️")
-            print("🤖 Qwen2.5 72B AI FULLY CONTROLS: Entry, TP, SL, Direction")
+            print("🤖 Qwen3 Max AI FULLY CONTROLS: Entry, TP, SL, Direction")
             print("💾 REAL trades saved to: aggressive_15min_scalping_real_history.json")
             confirm = input("Type 'AGGRESSIVE' to confirm: ").strip()
             if confirm.upper() == 'AGGRESSIVE':
