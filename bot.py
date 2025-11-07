@@ -52,6 +52,11 @@ class AggressiveFifteenMinScalpingBot:
         self.max_concurrent_trades = 8
         self.available_pairs = ["SOLUSDT", "XRPUSDT", "LINKUSDT", "DOGEUSDT", "SUIUSDT"]
         
+        # NEW: Risk Management Settings - 1:2 Risk Reward
+        self.risk_reward_ratio = 2.0  # 1:2 Risk Reward
+        self.min_sl_distance_percent = 0.8  # Minimum 0.8% SL distance
+        self.max_sl_distance_percent = 2.0  # Maximum 2% SL distance
+        
         # Track bot-opened trades only
         self.bot_opened_trades = {}
         
@@ -74,6 +79,7 @@ class AggressiveFifteenMinScalpingBot:
             self.print_color("FULL AI CONTROL 15MIN SCALPING BOT ACTIVATED!", self.Fore.RED + self.Style.BRIGHT)
             self.print_color("AI DECIDES: Entry, TP, SL | FIXED: $50 | 5x | SOL XRP LINK DOGE SUI", self.Fore.CYAN + self.Style.BRIGHT)
             self.print_color("AI USES 15M + 1H + 4H CONTEXT AUTOMATICALLY", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.print_color(f"RISK MANAGEMENT: 1:{self.risk_reward_ratio} | MIN SL: {self.min_sl_distance_percent}%", self.Fore.GREEN + self.Style.BRIGHT)
         except Exception as e:
             self.print_color(f"Binance initialization failed: {e}", self.Fore.RED)
             self.binance = None
@@ -307,40 +313,60 @@ class AggressiveFifteenMinScalpingBot:
             
             prompt = f"""
 <|system|>
-You are DeepSeek V3.1 in FULL AUTHORIZATION MODE.
+You are DeepSeek V3.1 in FULL AUTHORIZATION MODE with DEEP THINKING ANALYSIS.
 You MUST use:
 - Trade size: EXACTLY $50 USD
 - Leverage: EXACTLY 5x
 - Pairs: SOLUSDT, XRPUSDT, LINKUSDT, DOGEUSDT, SUIUSDT only
+- Risk Reward: 1:2 (TP should be 2x distance from SL)
+
+**DEEP THINKING ANALYSIS REQUIRED:**
+1. Analyze 15M chart for precise entry timing
+2. Check 1H trend for alignment
+3. Use 4H for major support/resistance levels
+4. Calculate optimal SL distance (0.8% - 2.0%)
+5. Ensure TP is exactly 2x SL distance
+
+**ENTRY CRITERIA:**
+- Only enter if 1H trend confirms 15M signal
+- Wait for proper candlestick patterns
+- Check volume confirmation
+- Avoid choppy market conditions
 
 You decide:
 - Direction (LONG/SHORT/HOLD)
 - Entry price
-- Take Profit
-- Stop Loss
+- Take Profit (2x SL distance)
+- Stop Loss (0.8% - 2.0% from entry)
 - Confidence (0-100)
 
 Only trade if confidence >= 80%. Return PERFECT JSON only.
-
-YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
-- Use 1H/4H for trend confirmation
-- Only take 15M signals that align with 1H trend
-- Avoid counter-trend trades unless strong reversal
 </|system|>
 
 <|user|>
-**FULL AI CONTROL 15-MINUTE SCALPING for {pair}**
+**DEEP THINKING ANALYSIS FOR {pair}**
 
-**MULTI-TIMEFRAME DATA:**
+**MULTI-TIMEFRAME DEEP ANALYSIS:**
 - 15M: Price ${current_price:.6f} | Change: {mtf_data['15m']['price_change_5p']:.2f}% | Trend: {mtf_data['15m']['trend']}
-- 1H: Trend: {mtf_data['1h']['trend']} | Change: {mtf_data['1h']['price_change_5p']:.2f}%
+- 1H: Trend: {mtf_data['1h']['trend']} | Change: {mtf_data['1h']['price_change_5p']:.2f}% | Volume: {mtf_data['1h']['volume_change']:.1f}%
 - 4H: Trend: {mtf_data['4h']['trend']} | Major level context
 
-**YOU DECIDE:**
-1. Analyze 15M momentum + volume
-2. Confirm with 1H trend
-3. Calculate quantity = (50 * 5) / entry_price
-4. Only trade if 1H trend aligns and confidence >= 80%
+**PRICE ACTION ANALYSIS:**
+- Recent Highs: {mtf_data['15m']['highs_last_5']}
+- Recent Lows: {mtf_data['15m']['lows_last_5']}
+- Volume Trend: {'Increasing' if mtf_data['15m']['volume_change'] > 0 else 'Decreasing'}
+
+**DEEP THINKING QUESTIONS:**
+1. Does 15M momentum align with 1H trend?
+2. Is there clear support/resistance nearby?
+3. Is volume confirming the move?
+4. What's the optimal SL distance (0.8%-2.0%)?
+5. Can TP be set at 2x SL distance?
+
+**CALCULATION:**
+- Quantity = (50 * 5) / entry_price
+- TP distance = 2x SL distance
+- SL distance = 0.8% to 2.0% from entry
 
 **RETURN ONLY THIS JSON:**
 ```json
@@ -350,28 +376,28 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
   "take_profit": number,
   "stop_loss": number,
   "confidence": 0-100,
-  "reason": "brief reason"
+  "reason": "detailed technical reason with timeframe alignment"
 }}
 """
             headers = {
                 "Authorization": f"Bearer {self.openrouter_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://your-bot.com",
-                "X-Title": "AI $50 5x Scalper"
+                "X-Title": "AI $50 5x Scalper - Deep Thinking"
             }
             data = {
                 "model": "deepseek/deepseek-chat-v3.1",
                 "messages": [
-                    {"role": "system", "content": "You are in FULL AUTHORIZATION MODE. Return JSON only."},
+                    {"role": "system", "content": "You are in FULL AUTHORIZATION MODE with DEEP THINKING. Return JSON only."},
                     {"role": "user", "content": prompt}
                 ],
-                "temperature": 0.3,
-                "max_tokens": 500,
-                "top_p": 0.9
+                "temperature": 0.2,  # Lower temperature for more consistent analysis
+                "max_tokens": 800,   # More tokens for deeper analysis
+                "top_p": 0.8
             }
             
-            self.print_color(f"AI Analyzing {pair} with 15M+1H+4H...", self.Fore.MAGENTA + self.Style.BRIGHT)
-            response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=40)
+            self.print_color(f"🤔 DEEP THINKING ANALYSIS: {pair} with 15M+1H+4H...", self.Fore.MAGENTA + self.Style.BRIGHT)
+            response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=60)
             
             if response.status_code == 200:
                 result = response.json()
@@ -380,27 +406,75 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                 direction, entry_price, take_profit, stop_loss, confidence, reason = self.parse_ai_response(ai_response)
                 
                 if direction == "HOLD" or confidence < 80:
-                    self.print_color(f"HOLD {pair} ({confidence}% confidence)", self.Fore.YELLOW)
+                    self.print_color(f"❌ HOLD {pair} ({confidence}% confidence) - {reason}", self.Fore.YELLOW)
                     return "HOLD", None, None, None, confidence, reason
+                
+                # Validate and adjust SL/TP for 1:2 risk reward
+                if direction == "LONG" and entry_price and stop_loss:
+                    sl_distance_percent = ((entry_price - stop_loss) / entry_price) * 100
+                    
+                    # Ensure minimum SL distance
+                    if sl_distance_percent < self.min_sl_distance_percent:
+                        new_stop_loss = entry_price * (1 - self.min_sl_distance_percent / 100)
+                        stop_loss = self.format_price(pair, new_stop_loss)
+                        self.print_color(f"🔧 Adjusted SL to minimum {self.min_sl_distance_percent}%", self.Fore.CYAN)
+                    
+                    # Ensure maximum SL distance  
+                    elif sl_distance_percent > self.max_sl_distance_percent:
+                        new_stop_loss = entry_price * (1 - self.max_sl_distance_percent / 100)
+                        stop_loss = self.format_price(pair, new_stop_loss)
+                        self.print_color(f"🔧 Adjusted SL to maximum {self.max_sl_distance_percent}%", self.Fore.CYAN)
+                    
+                    # Calculate TP for 1:2 risk reward
+                    risk_amount = entry_price - stop_loss
+                    take_profit = entry_price + (risk_amount * self.risk_reward_ratio)
+                    take_profit = self.format_price(pair, take_profit)
+                    
+                elif direction == "SHORT" and entry_price and stop_loss:
+                    sl_distance_percent = ((stop_loss - entry_price) / entry_price) * 100
+                    
+                    # Ensure minimum SL distance
+                    if sl_distance_percent < self.min_sl_distance_percent:
+                        new_stop_loss = entry_price * (1 + self.min_sl_distance_percent / 100)
+                        stop_loss = self.format_price(pair, new_stop_loss)
+                        self.print_color(f"🔧 Adjusted SL to minimum {self.min_sl_distance_percent}%", self.Fore.CYAN)
+                    
+                    # Ensure maximum SL distance
+                    elif sl_distance_percent > self.max_sl_distance_percent:
+                        new_stop_loss = entry_price * (1 + self.max_sl_distance_percent / 100)
+                        stop_loss = self.format_price(pair, new_stop_loss)
+                        self.print_color(f"🔧 Adjusted SL to maximum {self.max_sl_distance_percent}%", self.Fore.CYAN)
+                    
+                    # Calculate TP for 1:2 risk reward
+                    risk_amount = stop_loss - entry_price
+                    take_profit = entry_price - (risk_amount * self.risk_reward_ratio)
+                    take_profit = self.format_price(pair, take_profit)
                 
                 # Calculate quantity based on $50 and 5x
                 quantity = (self.trade_size_usd * self.default_leverage) / entry_price
                 quantity = self.format_quantity(pair, quantity)
                 
-                direction_icon = "LONG" if direction == "LONG" else "SHORT"
+                direction_icon = "📈 LONG" if direction == "LONG" else "📉 SHORT"
                 color = self.Fore.GREEN + self.Style.BRIGHT if direction == "LONG" else self.Fore.RED + self.Style.BRIGHT
                 
-                self.print_color(f"{direction_icon} {pair} | Entry: ${entry_price:.4f} | Qty: {quantity} | Conf: {confidence}%", color)
-                self.print_color(f"   AI TP: ${take_profit:.4f} | SL: ${stop_loss:.4f}", self.Fore.CYAN)
-                self.print_color(f"   Reason: {reason}", self.Fore.YELLOW)
+                # Calculate actual risk reward
+                if direction == "LONG":
+                    actual_risk_reward = (take_profit - entry_price) / (entry_price - stop_loss)
+                else:
+                    actual_risk_reward = (entry_price - take_profit) / (stop_loss - entry_price)
+                
+                self.print_color(f"✅ {direction_icon} {pair} | Entry: ${entry_price:.4f} | Qty: {quantity}", color)
+                self.print_color(f"   🎯 TP: ${take_profit:.4f} | 🛑 SL: ${stop_loss:.4f}", self.Fore.CYAN)
+                self.print_color(f"   📊 Risk Reward: 1:{actual_risk_reward:.1f} | Confidence: {confidence}%", self.Fore.MAGENTA)
+                self.print_color(f"   💡 Reason: {reason}", self.Fore.YELLOW)
                 
                 return direction, entry_price, take_profit, stop_loss, quantity, confidence, reason
             else:
-                self.print_color(f"API error: {response.status_code}", self.Fore.RED)
+                self.print_color(f"❌ API error: {response.status_code}", self.Fore.RED)
                 return "HOLD", None, None, None, 0, "API Error"
                 
         except Exception as e:
-            self.print_color(f"AI analysis failed: {e}", self.Fore.RED)
+            self.print_color(f"❌ AI analysis failed: {e}", self.Fore.RED)
             return "HOLD", None, None, None, 0, "Error"
 
     def get_current_price(self, pair):
@@ -442,7 +516,7 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
         try:
             pair = decision["pair"]
             if not self.can_open_new_trade(pair):
-                self.print_color(f"Cannot open {pair} - max trades reached", self.Fore.RED)
+                self.print_color(f"❌ Cannot open {pair} - max trades reached", self.Fore.RED)
                 return False
             
             direction = decision["direction"]
@@ -454,22 +528,40 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
             reason = decision["reason"]
             
             if not all([entry_price, take_profit, stop_loss, quantity]):
-                self.print_color("Invalid AI parameters", self.Fore.RED)
+                self.print_color("❌ Invalid AI parameters", self.Fore.RED)
                 return False
 
             take_profit = self.format_price(pair, take_profit)
             stop_loss = self.format_price(pair, stop_loss)
 
             direction_color = self.Fore.GREEN + self.Style.BRIGHT if direction == 'LONG' else self.Fore.RED + self.Style.BRIGHT
-            direction_icon = "LONG" if direction == 'LONG' else "SHORT"
+            direction_icon = "📈 LONG" if direction == 'LONG' else "📉 SHORT"
             
-            self.print_color(f"\nAI TRADE EXECUTION", self.Fore.CYAN + self.Style.BRIGHT)
+            # Calculate risk reward
+            if direction == "LONG":
+                risk_reward = (take_profit - entry_price) / (entry_price - stop_loss)
+            else:
+                risk_reward = (entry_price - take_profit) / (stop_loss - entry_price)
+            
+            self.print_color(f"\n🚀 AI TRADE EXECUTION", self.Fore.CYAN + self.Style.BRIGHT)
             self.print_color("=" * 70, self.Fore.CYAN)
             self.print_color(f"{direction_icon} {pair} | $50 | 5x", direction_color)
-            self.print_color(f"ENTRY: ${entry_price:.4f} | QTY: {quantity}", self.Fore.WHITE)
-            self.print_color(f"TP: ${take_profit:.4f} | SL: ${stop_loss:.4f}", self.Fore.YELLOW)
-            self.print_color(f"CONFIDENCE: {confidence}% | REASON: {reason}", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.print_color(f"📍 ENTRY: ${entry_price:.4f} | 📦 QTY: {quantity}", self.Fore.WHITE)
+            self.print_color(f"🎯 TP: ${take_profit:.4f} | 🛑 SL: ${stop_loss:.4f}", self.Fore.YELLOW)
+            self.print_color(f"📊 RISK-REWARD: 1:{risk_reward:.1f} | Confidence: {confidence}%", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.print_color(f"💡 REASON: {reason}", self.Fore.CYAN)
             self.print_color("=" * 70, self.Fore.CYAN)
+            
+            if not self.binance:
+                self.print_color("📝 PAPER TRADE EXECUTED (No Binance connection)", self.Fore.GREEN)
+                self.bot_opened_trades[pair] = {
+                    "pair": pair, "direction": direction, "entry_price": entry_price,
+                    "quantity": quantity, "stop_loss": stop_loss, "take_profit": take_profit,
+                    "entry_time": time.time(), "status": 'ACTIVE',
+                    'ai_confidence': confidence, 'ai_reason': reason,
+                    'entry_time_th': self.get_thailand_time()
+                }
+                return True
             
             entry_side = 'BUY' if direction == 'LONG' else 'SELL'
             try:
@@ -479,7 +571,7 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                     type='MARKET',
                     quantity=quantity
                 )
-                self.print_color(f"{direction} ORDER EXECUTED!", self.Fore.GREEN + self.Style.BRIGHT)
+                self.print_color(f"✅ {direction} ORDER EXECUTED!", self.Fore.GREEN + self.Style.BRIGHT)
                 time.sleep(1)
                 
                 stop_side = 'SELL' if direction == 'LONG' else 'BUY'
@@ -500,15 +592,15 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                     'entry_time_th': self.get_thailand_time()
                 }
                 
-                self.print_color(f"AI TRADE LIVE: {pair} {direction}", self.Fore.GREEN + self.Style.BRIGHT)
+                self.print_color(f"🤖 AI TRADE LIVE: {pair} {direction}", self.Fore.GREEN + self.Style.BRIGHT)
                 return True
                 
             except Exception as e:
-                self.print_color(f"Execution Error: {e}", self.Fore.RED)
+                self.print_color(f"❌ Execution Error: {e}", self.Fore.RED)
                 return False
             
         except Exception as e:
-            self.print_color(f"Trade failed: {e}", self.Fore.RED)
+            self.print_color(f"❌ Trade failed: {e}", self.Fore.RED)
             return False
 
     def get_live_position_data(self, pair):
@@ -532,7 +624,7 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                     }
             return None
         except Exception as e:
-            self.print_color(f"Error getting live data: {e}", self.Fore.RED)
+            self.print_color(f"❌ Error getting live data: {e}", self.Fore.RED)
             return None
 
     def monitor_positions(self):
@@ -548,28 +640,29 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                     closed_trades.append(pair)
                     continue
                     
-                direction_icon = "LONG" if trade['direction'] == 'LONG' else "SHORT"
+                direction_icon = "📈 LONG" if trade['direction'] == 'LONG' else "📉 SHORT"
                 pnl_color = self.Fore.GREEN + self.Style.BRIGHT if live_data['unrealized_pnl'] >= 0 else self.Fore.RED + self.Style.BRIGHT
                 
-                self.print_color(f"\nLIVE: {pair} {direction_icon} | P&L: ${live_data['unrealized_pnl']:.2f}", pnl_color)
-                self.print_color(f"   Entry: ${trade['entry_price']:.4f} | Current: ${live_data['current_price']:.4f}", self.Fore.WHITE)
-                self.print_color(f"   TP: ${trade['take_profit']:.4f} | SL: ${trade['stop_loss']:.4f}", self.Fore.YELLOW)
+                self.print_color(f"\n📊 LIVE: {pair} {direction_icon} | P&L: ${live_data['unrealized_pnl']:.2f}", pnl_color)
+                self.print_color(f"   📍 Entry: ${trade['entry_price']:.4f} | 🎯 Current: ${live_data['current_price']:.4f}", self.Fore.WHITE)
+                self.print_color(f"   🎯 TP: ${trade['take_profit']:.4f} | 🛑 SL: ${trade['stop_loss']:.4f}", self.Fore.YELLOW)
                     
             return closed_trades
         except Exception as e:
-            self.print_color(f"Monitoring error: {e}", self.Fore.RED)
+            self.print_color(f"❌ Monitoring error: {e}", self.Fore.RED)
             return []
 
     def close_trade_with_cleanup(self, pair, trade, close_reason="AI"):
         try:
-            open_orders = self.binance.futures_get_open_orders(symbol=pair)
-            canceled = 0
-            for order in open_orders:
-                if order['reduceOnly'] and order['symbol'] == pair:
-                    try:
-                        self.binance.futures_cancel_order(symbol=pair, orderId=order['orderId'])
-                        canceled += 1
-                    except: pass
+            if self.binance:
+                open_orders = self.binance.futures_get_open_orders(symbol=pair)
+                canceled = 0
+                for order in open_orders:
+                    if order['reduceOnly'] and order['symbol'] == pair:
+                        try:
+                            self.binance.futures_cancel_order(symbol=pair, orderId=order['orderId'])
+                            canceled += 1
+                        except: pass
             
             final_pnl = self.get_final_pnl(pair, trade)
             trade['status'] = 'CLOSED'
@@ -582,16 +675,16 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
             self.add_trade_to_history(closed_trade)
             
             pnl_color = self.Fore.GREEN + self.Style.BRIGHT if final_pnl > 0 else self.Fore.RED + self.Style.BRIGHT
-            direction_icon = "LONG" if trade['direction'] == 'LONG' else "SHORT"
-            self.print_color(f"\nAI CLOSED: {pair} {direction_icon}", pnl_color)
-            self.print_color(f"   Final P&L: ${final_pnl:.2f}", pnl_color)
-            if canceled > 0:
-                self.print_color(f"   Cleaned {canceled} orders", self.Fore.CYAN)
+            direction_icon = "📈 LONG" if trade['direction'] == 'LONG' else "📉 SHORT"
+            self.print_color(f"\n🔚 AI CLOSED: {pair} {direction_icon}", pnl_color)
+            self.print_color(f"   💰 Final P&L: ${final_pnl:.2f}", pnl_color)
+            if self.binance and canceled > 0:
+                self.print_color(f"   🧹 Cleaned {canceled} orders", self.Fore.CYAN)
                 
             del self.bot_opened_trades[pair]
             
         except Exception as e:
-            self.print_color(f"Cleanup failed: {e}", self.Fore.RED)
+            self.print_color(f"❌ Cleanup failed: {e}", self.Fore.RED)
 
     def get_final_pnl(self, pair, trade):
         try:
@@ -609,7 +702,7 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
             return 0
 
     def display_dashboard(self):
-        self.print_color(f"\nAI DASHBOARD - {self.get_thailand_time()}", self.Fore.RED + self.Style.BRIGHT)
+        self.print_color(f"\n🤖 AI DASHBOARD - {self.get_thailand_time()}", self.Fore.RED + self.Style.BRIGHT)
         self.print_color("=" * 90, self.Fore.RED)
         
         active_count = 0
@@ -620,21 +713,21 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                 active_count += 1
                 live_data = self.get_live_position_data(pair)
                 if live_data:
-                    direction_icon = "LONG" if trade['direction'] == 'LONG' else "SHORT"
+                    direction_icon = "📈 LONG" if trade['direction'] == 'LONG' else "📉 SHORT"
                     pnl_color = self.Fore.GREEN + self.Style.BRIGHT if live_data['unrealized_pnl'] >= 0 else self.Fore.RED + self.Style.BRIGHT
                     total_unrealized += live_data['unrealized_pnl']
                     
-                    self.print_color(f"{direction_icon} {pair} | Qty: {trade['quantity']}", self.Fore.WHITE + self.Style.BRIGHT)
-                    self.print_color(f"   Entry: ${trade['entry_price']:.4f} | Current: ${live_data['current_price']:.4f}", self.Fore.WHITE)
-                    self.print_color(f"   P&L: ${live_data['unrealized_pnl']:.2f}", pnl_color)
-                    self.print_color(f"   TP: ${trade['take_profit']:.4f} | SL: ${trade['stop_loss']:.4f}", self.Fore.YELLOW)
+                    self.print_color(f"{direction_icon} {pair} | 📦 Qty: {trade['quantity']}", self.Fore.WHITE + self.Style.BRIGHT)
+                    self.print_color(f"   📍 Entry: ${trade['entry_price']:.4f} | 🎯 Current: ${live_data['current_price']:.4f}", self.Fore.WHITE)
+                    self.print_color(f"   💰 P&L: ${live_data['unrealized_pnl']:.2f}", pnl_color)
+                    self.print_color(f"   🎯 TP: ${trade['take_profit']:.4f} | 🛑 SL: ${trade['stop_loss']:.4f}", self.Fore.YELLOW)
                     self.print_color("   " + "-" * 60, self.Fore.CYAN)
         
         if active_count == 0:
-            self.print_color("No active AI positions", self.Fore.YELLOW)
+            self.print_color("📭 No active AI positions", self.Fore.YELLOW)
         else:
             total_color = self.Fore.GREEN + self.Style.BRIGHT if total_unrealized >= 0 else self.Fore.RED + self.Style.BRIGHT
-            self.print_color(f"Active: {active_count} | Unrealized P&L: ${total_unrealized:.2f}", total_color)
+            self.print_color(f"📊 Active: {active_count} | 💰 Unrealized P&L: ${total_unrealized:.2f}", total_color)
 
     def get_ai_decision(self, pair_data):
         try:
@@ -662,7 +755,7 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                     "reason": reason
                 }
         except Exception as e:
-            self.print_color(f"AI decision failed: {e}", self.Fore.RED)
+            self.print_color(f"❌ AI decision failed: {e}", self.Fore.RED)
             return {"action": "HOLD", "confidence": 0}
 
     def run_trading_cycle(self):
@@ -676,7 +769,7 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
             
             market_data = self.get_market_data()
             if market_data:
-                self.print_color(f"\nAI SCANNING {len(market_data)} PAIRS...", self.Fore.BLUE + self.Style.BRIGHT)
+                self.print_color(f"\n🔍 AI SCANNING {len(market_data)} PAIRS...", self.Fore.BLUE + self.Style.BRIGHT)
                 
                 qualified_signals = 0
                 for pair in market_data.keys():
@@ -690,40 +783,41 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
                             time.sleep(1)
                     else:
                         if pair not in self.bot_opened_trades:
-                            self.print_color(f"SKIPPED: {pair} (max trades)", self.Fore.MAGENTA)
+                            self.print_color(f"⏭️  SKIPPED: {pair} (max trades)", self.Fore.MAGENTA)
                 
                 if qualified_signals == 0:
-                    self.print_color("No AI signals this cycle", self.Fore.YELLOW)
+                    self.print_color("💤 No AI signals this cycle", self.Fore.YELLOW)
                 else:
-                    self.print_color(f"{qualified_signals} AI signals executed", self.Fore.GREEN + self.Style.BRIGHT)
+                    self.print_color(f"✅ {qualified_signals} AI signals executed", self.Fore.GREEN + self.Style.BRIGHT)
             else:
-                self.print_color("No market data", self.Fore.RED)
+                self.print_color("❌ No market data", self.Fore.RED)
                 
         except Exception as e:
-            self.print_color(f"Cycle error: {e}", self.Fore.RED)
+            self.print_color(f"❌ Cycle error: {e}", self.Fore.RED)
 
     def start_trading(self):
-        self.print_color("FULL AI CONTROL 15MIN BOT STARTED!", self.Fore.RED + self.Style.BRIGHT)
-        self.print_color("FIXED: $50 | 5x | SOL XRP LINK DOGE SUI", self.Fore.CYAN + self.Style.BRIGHT)
-        self.print_color("AI USES 15M + 1H + 4H CONTEXT", self.Fore.MAGENTA + self.Style.BRIGHT)
+        self.print_color("🚀 FULL AI CONTROL 15MIN BOT STARTED!", self.Fore.RED + self.Style.BRIGHT)
+        self.print_color("💰 FIXED: $50 | 5x | SOL XRP LINK DOGE SUI", self.Fore.CYAN + self.Style.BRIGHT)
+        self.print_color("📊 AI USES 15M + 1H + 4H CONTEXT", self.Fore.MAGENTA + self.Style.BRIGHT)
+        self.print_color(f"🎯 RISK MANAGEMENT: 1:{self.risk_reward_ratio} | MIN SL: {self.min_sl_distance_percent}%", self.Fore.GREEN + self.Style.BRIGHT)
         self.cycle_count = 0
         
         while True:
             try:
                 self.cycle_count += 1
-                self.print_color(f"\nAI CYCLE {self.cycle_count}", self.Fore.RED + self.Style.BRIGHT)
+                self.print_color(f"\n🔄 AI CYCLE {self.cycle_count}", self.Fore.RED + self.Style.BRIGHT)
                 self.print_color("=" * 60, self.Fore.RED)
                 self.run_trading_cycle()
-                self.print_color(f"Waiting 3min...", self.Fore.BLUE)
+                self.print_color(f"⏰ Waiting 3min...", self.Fore.BLUE)
                 time.sleep(180)  # 15m timeframe → 3min cycle
                 
             except KeyboardInterrupt:
-                self.print_color(f"\nAI BOT STOPPED", self.Fore.RED + self.Style.BRIGHT)
+                self.print_color(f"\n🛑 AI BOT STOPPED", self.Fore.RED + self.Style.BRIGHT)
                 self.show_trade_history(10)
                 self.show_trading_stats()
                 break
             except Exception as e:
-                self.print_color(f"Error: {e}", self.Fore.RED)
+                self.print_color(f"❌ Error: {e}", self.Fore.RED)
                 time.sleep(180)
 
 
@@ -742,9 +836,9 @@ class AggressiveFifteenMinPaperTradingBot:
         # Load existing paper history
         self.paper_history = self.load_paper_history()
         
-        self.real_bot.print_color("PAPER TRADING MODE ACTIVATED", self.Fore.GREEN + self.Style.BRIGHT)
-        self.real_bot.print_color(f"Starting Balance: ${self.paper_balance}", self.Fore.CYAN + self.Style.BRIGHT)
-        self.real_bot.print_color("AI FULL CONTROL - $50 | 5x | 15MIN TIMEFRAME", self.Fore.CYAN + self.Style.BRIGHT)
+        self.real_bot.print_color("📝 PAPER TRADING MODE ACTIVATED", self.Fore.GREEN + self.Style.BRIGHT)
+        self.real_bot.print_color(f"💰 Starting Balance: ${self.paper_balance}", self.Fore.CYAN + self.Style.BRIGHT)
+        self.real_bot.print_color("🤖 AI FULL CONTROL - $50 | 5x | 15MIN TIMEFRAME", self.Fore.CYAN + self.Style.BRIGHT)
     
     def load_paper_history(self):
         try:
@@ -753,16 +847,16 @@ class AggressiveFifteenMinPaperTradingBot:
                     return json.load(f)
             return []
         except Exception as e:
-            self.real_bot.print_color(f"Paper history load error: {e}", self.Fore.RED)
+            self.real_bot.print_color(f"❌ Paper history load error: {e}", self.Fore.RED)
             return []
 
     def save_paper_history(self):
         try:
             with open(self.paper_history_file, 'w') as f:
                 json.dump(self.paper_history, f, indent=2)
-            self.real_bot.print_color(f"Paper history saved to {self.paper_history_file}", self.Fore.CYAN)
+            self.real_bot.print_color(f"💾 Paper history saved to {self.paper_history_file}", self.Fore.CYAN)
         except Exception as e:
-            self.real_bot.print_color(f"Paper history save error: {e}", self.Fore.RED)
+            self.real_bot.print_color(f"❌ Paper history save error: {e}", self.Fore.RED)
 
     def add_paper_trade_to_history(self, trade_data):
         try:
@@ -772,9 +866,9 @@ class AggressiveFifteenMinPaperTradingBot:
             if len(self.paper_history) > 200:
                 self.paper_history = self.paper_history[-200:]
             self.save_paper_history()
-            self.real_bot.print_color(f"PAPER TRADE SAVED: {trade_data['pair']} {trade_data['direction']} P&L: ${trade_data.get('pnl', 0):.2f}", self.Fore.CYAN)
+            self.real_bot.print_color(f"💾 PAPER TRADE SAVED: {trade_data['pair']} {trade_data['direction']} P&L: ${trade_data.get('pnl', 0):.2f}", self.Fore.CYAN)
         except Exception as e:
-            self.real_bot.print_color(f"Paper history add error: {e}", self.Fore.RED)
+            self.real_bot.print_color(f"❌ Paper history add error: {e}", self.Fore.RED)
 
     def paper_execute_trade(self, decision):
         try:
@@ -793,14 +887,20 @@ class AggressiveFifteenMinPaperTradingBot:
             stop_loss = self.real_bot.format_price(pair, stop_loss)
             
             direction_color = self.Fore.GREEN + self.Style.BRIGHT if direction == 'LONG' else self.Fore.RED + self.Style.BRIGHT
-            direction_icon = "LONG" if direction == 'LONG' else "SHORT"
+            direction_icon = "📈 LONG" if direction == 'LONG' else "📉 SHORT"
             
-            self.real_bot.print_color(f"\nPAPER TRADE", self.Fore.CYAN + self.Style.BRIGHT)
+            # Calculate risk reward
+            if direction == "LONG":
+                risk_reward = (take_profit - entry_price) / (entry_price - stop_loss)
+            else:
+                risk_reward = (entry_price - take_profit) / (stop_loss - entry_price)
+            
+            self.real_bot.print_color(f"\n📝 PAPER TRADE", self.Fore.CYAN + self.Style.BRIGHT)
             self.real_bot.print_color("=" * 70, self.Fore.CYAN)
             self.real_bot.print_color(f"{direction_icon} {pair} | $50 | 5x", direction_color)
-            self.real_bot.print_color(f"ENTRY: ${entry_price:.4f} | QTY: {quantity}", self.Fore.WHITE)
-            self.real_bot.print_color(f"TP: ${take_profit:.4f} | SL: ${stop_loss:.4f}", self.Fore.YELLOW)
-            self.real_bot.print_color(f"CONF: {confidence}%", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.real_bot.print_color(f"📍 ENTRY: ${entry_price:.4f} | 📦 QTY: {quantity}", self.Fore.WHITE)
+            self.real_bot.print_color(f"🎯 TP: ${take_profit:.4f} | 🛑 SL: ${stop_loss:.4f}", self.Fore.YELLOW)
+            self.real_bot.print_color(f"📊 RISK-REWARD: 1:{risk_reward:.1f} | CONF: {confidence}%", self.Fore.MAGENTA + self.Style.BRIGHT)
             self.real_bot.print_color("=" * 70, self.Fore.CYAN)
             
             self.paper_positions[pair] = {
@@ -811,7 +911,7 @@ class AggressiveFifteenMinPaperTradingBot:
             }
             return True
         except Exception as e:
-            self.real_bot.print_color(f"Paper trade failed: {e}", self.Fore.RED)
+            self.real_bot.print_color(f"❌ Paper trade failed: {e}", self.Fore.RED)
             return False
 
     def monitor_paper_positions(self):
@@ -832,20 +932,20 @@ class AggressiveFifteenMinPaperTradingBot:
                 if trade['direction'] == 'LONG':
                     if current_price >= trade['take_profit']:
                         should_close = True
-                        close_reason = "TP"
+                        close_reason = "🎯 TP HIT"
                         pnl = (current_price - trade['entry_price']) * trade['quantity']
                     elif current_price <= trade['stop_loss']:
                         should_close = True
-                        close_reason = "SL"
+                        close_reason = "🛑 SL HIT"
                         pnl = (current_price - trade['entry_price']) * trade['quantity']
                 else:
                     if current_price <= trade['take_profit']:
                         should_close = True
-                        close_reason = "TP"
+                        close_reason = "🎯 TP HIT"
                         pnl = (trade['entry_price'] - current_price) * trade['quantity']
                     elif current_price >= trade['stop_loss']:
                         should_close = True
-                        close_reason = "SL"
+                        close_reason = "🛑 SL HIT"
                         pnl = (trade['entry_price'] - current_price) * trade['quantity']
                 
                 if should_close:
@@ -860,16 +960,16 @@ class AggressiveFifteenMinPaperTradingBot:
                     closed.append(pair)
                     
                     pnl_color = self.Fore.GREEN + self.Style.BRIGHT if pnl > 0 else self.Fore.RED + self.Style.BRIGHT
-                    direction_icon = "LONG" if trade['direction'] == 'LONG' else "SHORT"
-                    self.real_bot.print_color(f"\nPAPER CLOSED: {pair} {direction_icon}", pnl_color)
-                    self.real_bot.print_color(f"   P&L: ${pnl:.2f} | {close_reason}", pnl_color)
-                    self.real_bot.print_color(f"   Balance: ${self.paper_balance:.2f}", self.Fore.CYAN)
+                    direction_icon = "📈 LONG" if trade['direction'] == 'LONG' else "📉 SHORT"
+                    self.real_bot.print_color(f"\n🔚 PAPER CLOSED: {pair} {direction_icon}", pnl_color)
+                    self.real_bot.print_color(f"   💰 P&L: ${pnl:.2f} | {close_reason}", pnl_color)
+                    self.real_bot.print_color(f"   💵 Balance: ${self.paper_balance:.2f}", self.Fore.CYAN)
                     
                     del self.paper_positions[pair]
                     
             return closed
         except Exception as e:
-            self.real_bot.print_color(f"Paper monitoring error: {e}", self.Fore.RED)
+            self.real_bot.print_color(f"❌ Paper monitoring error: {e}", self.Fore.RED)
             return []
 
     def run_paper_cycle(self):
@@ -885,19 +985,19 @@ class AggressiveFifteenMinPaperTradingBot:
                             self.paper_execute_trade(decision)
                             time.sleep(1)
         except Exception as e:
-            self.real_bot.print_color(f"Paper cycle error: {e}", self.Fore.RED)
+            self.real_bot.print_color(f"❌ Paper cycle error: {e}", self.Fore.RED)
 
     def start_paper_trading(self):
-        self.real_bot.print_color("PAPER 15MIN TRADING STARTED!", self.Fore.GREEN + self.Style.BRIGHT)
+        self.real_bot.print_color("📝 PAPER 15MIN TRADING STARTED!", self.Fore.GREEN + self.Style.BRIGHT)
         cycle = 0
         while True:
             try:
                 cycle += 1
-                self.real_bot.print_color(f"\nPAPER CYCLE {cycle}", self.Fore.GREEN + self.Style.BRIGHT)
+                self.real_bot.print_color(f"\n🔄 PAPER CYCLE {cycle}", self.Fore.GREEN + self.Style.BRIGHT)
                 self.run_paper_cycle()
                 time.sleep(180)  # 3min cycle for 15min chart
             except KeyboardInterrupt:
-                self.real_bot.print_color("PAPER TRADING STOPPED", self.Fore.YELLOW)
+                self.real_bot.print_color("🛑 PAPER TRADING STOPPED", self.Fore.YELLOW)
                 break
 
 
@@ -906,12 +1006,13 @@ if __name__ == "__main__":
         bot = AggressiveFifteenMinScalpingBot()
         
         print("\n" + "="*80)
-        print("AGGRESSIVE 15MIN AI SCALPING BOT - DEEPSEEK V3.1")
-        print("MULTI-TIMEFRAME: 15M + 1H + 4H | PAPER HISTORY FIXED")
+        print("🤖 AGGRESSIVE 15MIN AI SCALPING BOT - DEEPSEEK V3.1")
+        print("📊 MULTI-TIMEFRAME: 15M + 1H + 4H | DEEP THINKING ANALYSIS")
+        print("🎯 RISK MANAGEMENT: 1:2 RISK-REWARD | MIN SL 0.8%")
         print("="*80)
         print("SELECT MODE:")
-        print("1. Live Trading ($50 | 5x | Real Money)")
-        print("2. Paper Trading (No Risk)")
+        print("1. 🚀 Live Trading ($50 | 5x | Real Money)")
+        print("2. 📝 Paper Trading (No Risk)")
         
         choice = input("Enter choice (1-2): ").strip()
         
@@ -920,10 +1021,10 @@ if __name__ == "__main__":
             if confirm.upper() == 'AGGRESSIVE':
                 bot.start_trading()
             else:
-                print("Cancelled.")
+                print("❌ Cancelled.")
         else:
             paper_bot = AggressiveFifteenMinPaperTradingBot(bot)
             paper_bot.start_paper_trading()
             
     except Exception as e:
-        print(f"Failed to start bot: {e}")
+        print(f"❌ Failed to start bot: {e}")
