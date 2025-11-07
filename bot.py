@@ -298,14 +298,14 @@ class AggressiveFifteenMinScalpingBot:
         return data
 
     def get_deepseek_analysis(self, pair, mtf_data):
-        try:
-            if not self.openrouter_key:
-                self.print_color("OpenRouter API key not found", self.Fore.RED)
-                return "HOLD", None, None, None, 0, "No API key"
-            
-            current_price = mtf_data['15m']['current_price']
-            
-            prompt = f"""
+    try:
+        if not self.openrouter_key:
+            self.print_color("OpenRouter API key not found", self.Fore.RED)
+            return "HOLD", None, None, None, 0, "No API key"
+        
+        current_price = mtf_data['15m']['current_price']
+        
+        prompt = f"""
 <|system|>
 You are DeepSeek V3.1 in FULL AUTHORIZATION MODE.
 You MUST use:
@@ -353,56 +353,55 @@ YOU HAVE ACCESS TO MULTI-TIMEFRAME DATA:
   "reason": "brief reason"
 }}
 """
-            headers = {
-                "Authorization": f"Bearer {self.openrouter_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://your-bot.com",
-                "X-Title": "AI $50 5x Scalper"
-            }
-            data = {
-                "model": "deepseek/deepseek-chat-v3.1",
-                "messages": [
-                    {"role": "system", "content": "You are in FULL AUTHORIZATION MODE. Return JSON only."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.3,
-                "max_tokens": 500,
-                "top_p": 0.9
-            }
+        headers = {
+            "Authorization": f"Bearer {self.openrouter_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://your-bot.com",
+            "X-Title": "AI $50 5x Scalper"
+        }
+        data = {
+            "model": "deepseek/deepseek-chat-v3.1",
+            "messages": [
+                {"role": "system", "content": "You are in FULL AUTHORIZATION MODE. Return JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.3,
+            "max_tokens": 500,
+            "top_p": 0.9
+        }
+        
+        self.print_color(f"AI Analyzing {pair} with 15M+1H+4H...", self.Fore.MAGENTA + self.Style.BRIGHT)
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=40)
+        
+        if response.status_code == 200:
+            result = response.json()
+            ai_response = result['choices'][0]['message']['content'].strip()
             
-                        self.print_color(f"AI Analyzing {pair} with 15M+1H+4H...", self.Fore.MAGENTA + self.Style.BRIGHT)
-            response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=40)
+            direction, entry_price, take_profit, stop_loss, confidence, reason = self.parse_ai_response(ai_response)
             
-            if response.status_code == 200:
-                result = response.json()
-                ai_response = result['choices'][0]['message']['content'].strip()
-                
-                direction, entry_price, take_profit, stop_loss, confidence, reason = self.parse_ai_response(ai_response)
-                
-                if direction == "HOLD" or confidence < 80:
-                    self.print_color(f"HOLD {pair} ({confidence}% confidence)", self.Fore.YELLOW)
-                    return "HOLD", None, None, None, confidence, reason
-                
-                # Calculate quantity based on $50 and 5x
-                quantity = (self.trade_size_usd * self.default_leverage) / entry_price
-                quantity = self.format_quantity(pair, quantity)
-                
-                direction_icon = "LONG" if direction == "LONG" else "SHORT"
-                color = self.Fore.GREEN + self.Style.BRIGHT if direction == "LONG" else self.Fore.RED + self.Style.BRIGHT
-                
-                self.print_color(f"{direction_icon} {pair} | Entry: ${entry_price:.4f} | Qty: {quantity} | Conf: {confidence}%", color)
-                self.print_color(f"   AI TP: ${take_profit:.4f} | SL: ${stop_loss:.4f}", self.Fore.CYAN)
-                self.print_color(f"   Reason: {reason}", self.Fore.YELLOW)
-                
-                return direction, entry_price, take_profit, stop_loss, quantity, confidence, reason
-            else:
-                self.print_color(f"API error: {response.status_code}", self.Fore.RED)
-                return "HOLD", None, None, None, 0, "API Error"
-                
-        except Exception as e:
-            self.print_color(f"AI analysis failed: {e}", self.Fore.RED)
-            return "HOLD", None, None, None, 0, "Error"
-
+            if direction == "HOLD" or confidence < 80:
+                self.print_color(f"HOLD {pair} ({confidence}% confidence)", self.Fore.YELLOW)
+                return "HOLD", None, None, None, confidence, reason
+            
+            # Calculate quantity based on $50 and 5x
+            quantity = (self.trade_size_usd * self.default_leverage) / entry_price
+            quantity = self.format_quantity(pair, quantity)
+            
+            direction_icon = "LONG" if direction == "LONG" else "SHORT"
+            color = self.Fore.GREEN + self.Style.BRIGHT if direction == "LONG" else self.Fore.RED + self.Style.BRIGHT
+            
+            self.print_color(f"{direction_icon} {pair} | Entry: ${entry_price:.4f} | Qty: {quantity} | Conf: {confidence}%", color)
+            self.print_color(f"   AI TP: ${take_profit:.4f} | SL: ${stop_loss:.4f}", self.Fore.CYAN)
+            self.print_color(f"   Reason: {reason}", self.Fore.YELLOW)
+            
+            return direction, entry_price, take_profit, stop_loss, quantity, confidence, reason
+        else:
+            self.print_color(f"API error: {response.status_code}", self.Fore.RED)
+            return "HOLD", None, None, None, 0, "API Error"
+            
+    except Exception as e:
+        self.print_color(f"AI analysis failed: {e}", self.Fore.RED)
+        return "HOLD", None, None, None, 0, "Error"
     def get_current_price(self, pair):
         try:
             if self.binance:
