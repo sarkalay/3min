@@ -58,9 +58,14 @@ class SmartAITradingBot:
         # Track bot-opened trades only
         self.bot_opened_trades = {}
         
-        # Trade history
-        self.trade_history_file = "smart_ai_trading_history.json"
+        # Trade history - Separate files for paper and real trading
+        self.real_trade_history_file = "real_trading_history.json"
+        self.paper_trade_history_file = "paper_trading_history.json"
         self.trade_history = self.load_trade_history()
+        
+        # Paper trading balance
+        self.paper_balance = 10000  # Starting paper balance
+        self.initial_balance = 10000
         
         # Precision settings
         self.quantity_precision = {}
@@ -74,12 +79,18 @@ class SmartAITradingBot:
         # Initialize Binance client
         try:
             self.binance = Client(self.binance_api_key, self.binance_secret)
+            self.trade_history_file = self.real_trade_history_file
             self.print_color("SMART AI TRADING BOT WITH DEEP THINKING ACTIVATED!", self.Fore.GREEN + self.Style.BRIGHT)
-            self.print_color("AI DECIDES EVERYTHING: Entry, TP, SL, Analysis", self.Fore.CYAN + self.Style.BRIGHT)
-            self.print_color("15M TIMEFRAME + DEEP THINKING ANALYSIS", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.print_color("💰 REAL TRADING MODE - Connected to Binance", self.Fore.CYAN + self.Style.BRIGHT)
         except Exception as e:
-            self.print_color(f"Binance initialization failed: {e}", self.Fore.RED)
             self.binance = None
+            self.trade_history_file = self.paper_trade_history_file
+            self.print_color("SMART AI TRADING BOT WITH DEEP THINKING ACTIVATED!", self.Fore.GREEN + self.Style.BRIGHT)
+            self.print_color("📝 PAPER TRADING MODE - No Binance connection", self.Fore.YELLOW + self.Style.BRIGHT)
+            self.print_color(f"💰 Starting Paper Balance: ${self.paper_balance}", self.Fore.CYAN)
+        
+        self.print_color("AI DECIDES EVERYTHING: Entry, TP, SL, Analysis", self.Fore.MAGENTA + self.Style.BRIGHT)
+        self.print_color("15M TIMEFRAME + DEEP THINKING ANALYSIS", self.Fore.BLUE + self.Style.BRIGHT)
         
         self.validate_config()
         if self.binance:
@@ -87,39 +98,110 @@ class SmartAITradingBot:
             self.load_symbol_precision()
     
     def load_trade_history(self):
+        """Load trade history from appropriate file based on mode"""
         try:
-            if os.path.exists(self.trade_history_file):
-                with open(self.trade_history_file, 'r') as f:
-                    return json.load(f)
+            history_file = self.real_trade_history_file if self.binance else self.paper_trade_history_file
+            if os.path.exists(history_file):
+                with open(history_file, 'r') as f:
+                    history = json.load(f)
+                    # Calculate statistics from loaded history
+                    if history:
+                        self.total_trades = len(history)
+                        self.winning_trades = len([t for t in history if t.get('pnl', 0) > 0])
+                        self.total_pnl = sum(t.get('pnl', 0) for t in history)
+                    return history
             return []
         except Exception as e:
             self.print_color(f"Error loading trade history: {e}", self.Fore.RED)
             return []
     
     def save_trade_history(self):
+        """Save trade history to appropriate file"""
         try:
             with open(self.trade_history_file, 'w') as f:
                 json.dump(self.trade_history, f, indent=2)
+            self.print_color(f"💾 Trade history saved to {self.trade_history_file}", self.Fore.CYAN)
         except Exception as e:
             self.print_color(f"Error saving trade history: {e}", self.Fore.RED)
     
     def add_trade_to_history(self, trade_data):
+        """Add trade to history and update statistics"""
         try:
             trade_data['close_time'] = self.get_thailand_time()
             trade_data['close_timestamp'] = time.time()
+            trade_data['mode'] = 'REAL' if self.binance else 'PAPER'
+            
             self.trade_history.append(trade_data)
             
+            # Update statistics
             self.total_trades += 1
             pnl = trade_data.get('pnl', 0)
             self.total_pnl += pnl
             if pnl > 0:
                 self.winning_trades += 1
-                
+            
+            # Update paper balance if in paper mode
+            if not self.binance:
+                self.paper_balance += pnl
+                trade_data['paper_balance_after'] = self.paper_balance
+            
+            # Keep only last 200 trades
             if len(self.trade_history) > 200:
                 self.trade_history = self.trade_history[-200:]
+            
             self.save_trade_history()
+            
+            # Print trade result
+            pnl_color = self.Fore.GREEN if pnl > 0 else self.Fore.RED if pnl < 0 else self.Fore.YELLOW
+            self.print_color(f"💾 Trade saved to history: {trade_data['pair']} {trade_data['direction']} P&L: ${pnl:.2f}", pnl_color)
+            if not self.binance:
+                self.print_color(f"💰 Paper Balance: ${self.paper_balance:.2f}", self.Fore.CYAN)
+                
         except Exception as e:
             self.print_color(f"Error adding trade to history: {e}", self.Fore.RED)
+    
+    def show_trading_stats(self):
+        """Show trading statistics"""
+        if self.total_trades == 0:
+            self.print_color("No trades yet", self.Fore.YELLOW)
+            return
+            
+        win_rate = (self.winning_trades / self.total_trades) * 100
+        avg_trade = self.total_pnl / self.total_trades
+        
+        self.print_color(f"\n📊 TRADING STATISTICS", self.Fore.CYAN + self.Style.BRIGHT)
+        self.print_color("=" * 50, self.Fore.CYAN)
+        self.print_color(f"Total Trades: {self.total_trades}", self.Fore.WHITE)
+        self.print_color(f"Winning Trades: {self.winning_trades}", self.Fore.GREEN)
+        self.print_color(f"Win Rate: {win_rate:.1f}%", self.Fore.GREEN + self.Style.BRIGHT if win_rate > 50 else self.Fore.YELLOW)
+        self.print_color(f"Total P&L: ${self.total_pnl:.2f}", self.Fore.GREEN + self.Style.BRIGHT if self.total_pnl > 0 else self.Fore.RED + self.Style.BRIGHT)
+        self.print_color(f"Average P&L per Trade: ${avg_trade:.2f}", self.Fore.WHITE)
+        
+        if not self.binance:
+            balance_change = ((self.paper_balance - self.initial_balance) / self.initial_balance) * 100
+            change_color = self.Fore.GREEN if balance_change >= 0 else self.Fore.RED
+            self.print_color(f"💰 Paper Balance: ${self.paper_balance:.2f}", self.Fore.CYAN)
+            self.print_color(f"📈 Balance Change: {balance_change:+.2f}%", change_color)
+    
+    def show_trade_history(self, limit=10):
+        """Show recent trade history"""
+        if not self.trade_history:
+            self.print_color("No trade history found", self.Fore.YELLOW)
+            return
+        
+        self.print_color(f"\n📋 RECENT TRADE HISTORY (Last {min(limit, len(self.trade_history))} trades)", self.Fore.MAGENTA + self.Style.BRIGHT)
+        self.print_color("=" * 80, self.Fore.MAGENTA)
+        
+        recent_trades = self.trade_history[-limit:]
+        for i, trade in enumerate(reversed(recent_trades)):
+            pnl = trade.get('pnl', 0)
+            pnl_color = self.Fore.GREEN + self.Style.BRIGHT if pnl > 0 else self.Fore.RED + self.Style.BRIGHT if pnl < 0 else self.Fore.YELLOW
+            direction_icon = "🟢 LONG" if trade['direction'] == 'LONG' else "🔴 SHORT"
+            close_reason = trade.get('close_reason', 'N/A')
+            mode = trade.get('mode', 'UNKNOWN')
+            
+            self.print_color(f"{i+1:2d}. {direction_icon} {trade['pair']} | Entry: ${trade.get('entry_price', 0):.4f} | Exit: ${trade.get('exit_price', 0):.4f}", pnl_color)
+            self.print_color(f"     P&L: ${pnl:.2f} | {close_reason} | {mode}", pnl_color)
     
     def get_thailand_time(self):
         now_utc = datetime.now(pytz.utc)
@@ -133,8 +215,8 @@ class SmartAITradingBot:
             print(text)
     
     def validate_config(self):
-        if not all([self.binance_api_key, self.binance_secret, self.openrouter_key]):
-            self.print_color("Missing API keys!", self.Fore.RED)
+        if not self.openrouter_key:
+            self.print_color("Missing OpenRouter API key!", self.Fore.RED)
             return False
         return True
 
@@ -148,6 +230,7 @@ class SmartAITradingBot:
                     self.binance.futures_change_margin_type(symbol=pair, marginType='ISOLATED')
                 except Exception as e:
                     pass
+            self.print_color("✅ Futures setup completed", self.Fore.GREEN)
         except Exception as e:
             self.print_color(f"Futures setup failed: {e}", self.Fore.RED)
     
@@ -172,6 +255,7 @@ class SmartAITradingBot:
                         tick_size = f['tickSize']
                         price_precision = len(tick_size.split('.')[1].rstrip('0')) if '.' in tick_size else 0
                         self.price_precision[pair] = price_precision
+            self.print_color("✅ Symbol precision loaded", self.Fore.GREEN)
         except Exception as e:
             for pair in self.available_pairs:
                 self.quantity_precision[pair] = 3
@@ -221,7 +305,6 @@ class SmartAITradingBot:
                 klines = self.binance.futures_klines(symbol=pair, interval=interval, limit=limit)
             else:
                 # Fallback to REST API
-                import requests
                 url = "https://api.binance.com/api/v3/klines"
                 params = {
                     'symbol': pair,
@@ -249,8 +332,6 @@ class SmartAITradingBot:
         """Get comprehensive market analysis for a pair"""
         try:
             klines_15m = self.get_klines_data(pair, '15m', 20)
-            klines_1h = self.get_klines_data(pair, '1h', 10)
-            klines_4h = self.get_klines_data(pair, '4h', 5)
             
             if not klines_15m:
                 return None
@@ -452,7 +533,6 @@ Return ONLY JSON format below after completing all thinking steps:
                 ticker = self.binance.futures_symbol_ticker(symbol=pair)
                 return float(ticker['price'])
             else:
-                import requests
                 url = f"https://api.binance.com/api/v3/ticker/price"
                 params = {'symbol': pair}
                 response = requests.get(url, params=params, timeout=5)
@@ -508,7 +588,8 @@ Return ONLY JSON format below after completing all thinking steps:
                     "quantity": quantity, "stop_loss": stop_loss, "take_profit": take_profit,
                     "entry_time": time.time(), "status": 'ACTIVE',
                     'ai_confidence': confidence, 'ai_reason': reason,
-                    'entry_time_th': self.get_thailand_time()
+                    'entry_time_th': self.get_thailand_time(),
+                    'paper_balance_before': self.paper_balance
                 }
                 return True
             
@@ -558,84 +639,51 @@ Return ONLY JSON format below after completing all thinking steps:
                 if trade['status'] != 'ACTIVE':
                     continue
                 
-                if not self.binance:
-                    # Paper trading monitoring
-                    current_price = self.get_current_price(pair)
-                    if not current_price:
-                        continue
-                    
-                    should_close = False
-                    close_reason = ""
-                    
-                    if trade['direction'] == 'LONG':
-                        if current_price >= trade['take_profit']:
-                            should_close = True
-                            close_reason = "TP HIT"
-                        elif current_price <= trade['stop_loss']:
-                            should_close = True
-                            close_reason = "SL HIT"
-                    else:
-                        if current_price <= trade['take_profit']:
-                            should_close = True
-                            close_reason = "TP HIT"
-                        elif current_price >= trade['stop_loss']:
-                            should_close = True
-                            close_reason = "SL HIT"
-                    
-                    if should_close:
-                        # Calculate PnL
-                        if trade['direction'] == 'LONG':
-                            pnl = (current_price - trade['entry_price']) * trade['quantity']
-                        else:
-                            pnl = (trade['entry_price'] - current_price) * trade['quantity']
-                        
-                        trade['status'] = 'CLOSED'
-                        trade['exit_price'] = current_price
-                        trade['pnl'] = pnl
-                        trade['close_reason'] = close_reason
-                        
-                        closed_trade = trade.copy()
-                        self.add_trade_to_history(closed_trade)
-                        
-                        pnl_color = self.Fore.GREEN + self.Style.BRIGHT if pnl > 0 else self.Fore.RED + self.Style.BRIGHT
-                        direction_icon = "LONG" if trade['direction'] == 'LONG' else "SHORT"
-                        self.print_color(f"🔚 TRADE CLOSED: {pair} {direction_icon} - {close_reason}", pnl_color)
-                        self.print_color(f"   💰 P&L: ${pnl:.2f}", pnl_color)
-                        
-                        del self.bot_opened_trades[pair]
-                        closed_trades.append(pair)
+                current_price = self.get_current_price(pair)
+                if not current_price:
+                    continue
                 
+                should_close = False
+                close_reason = ""
+                pnl = 0
+                
+                if trade['direction'] == 'LONG':
+                    if current_price >= trade['take_profit']:
+                        should_close = True
+                        close_reason = "🎯 TP HIT"
+                        pnl = (current_price - trade['entry_price']) * trade['quantity']
+                    elif current_price <= trade['stop_loss']:
+                        should_close = True
+                        close_reason = "🛑 SL HIT"
+                        pnl = (current_price - trade['entry_price']) * trade['quantity']
                 else:
-                    # Real trading monitoring
-                    positions = self.binance.futures_position_information(symbol=pair)
-                    position_active = False
+                    if current_price <= trade['take_profit']:
+                        should_close = True
+                        close_reason = "🎯 TP HIT"
+                        pnl = (trade['entry_price'] - current_price) * trade['quantity']
+                    elif current_price >= trade['stop_loss']:
+                        should_close = True
+                        close_reason = "🛑 SL HIT"
+                        pnl = (trade['entry_price'] - current_price) * trade['quantity']
+                
+                if should_close:
+                    trade['status'] = 'CLOSED'
+                    trade['exit_price'] = current_price
+                    trade['pnl'] = pnl
+                    trade['close_reason'] = close_reason
+                    trade['close_time'] = self.get_thailand_time()
                     
-                    for pos in positions:
-                        if pos['symbol'] == pair and float(pos['positionAmt']) != 0:
-                            position_active = True
-                            break
+                    # Add to history
+                    self.add_trade_to_history(trade.copy())
                     
-                    if not position_active:
-                        # Position closed (by TP/SL)
-                        current_price = self.get_current_price(pair)
-                        if trade['direction'] == 'LONG':
-                            pnl = (current_price - trade['entry_price']) * trade['quantity']
-                        else:
-                            pnl = (trade['entry_price'] - current_price) * trade['quantity']
-                        
-                        trade['status'] = 'CLOSED'
-                        trade['exit_price'] = current_price
-                        trade['pnl'] = pnl
-                        trade['close_reason'] = "AUTO CLOSE"
-                        
-                        closed_trade = trade.copy()
-                        self.add_trade_to_history(closed_trade)
-                        
-                        pnl_color = self.Fore.GREEN + self.Style.BRIGHT if pnl > 0 else self.Fore.RED + self.Style.BRIGHT
-                        self.print_color(f"🔚 POSITION CLOSED: {pair} - P&L: ${pnl:.2f}", pnl_color)
-                        
-                        del self.bot_opened_trades[pair]
-                        closed_trades.append(pair)
+                    closed_trades.append(pair)
+                    
+                    pnl_color = self.Fore.GREEN + self.Style.BRIGHT if pnl > 0 else self.Fore.RED + self.Style.BRIGHT
+                    direction_icon = "LONG" if trade['direction'] == 'LONG' else "SHORT"
+                    self.print_color(f"🔚 TRADE CLOSED: {pair} {direction_icon} - {close_reason}", pnl_color)
+                    self.print_color(f"   💰 P&L: ${pnl:.2f}", pnl_color)
+                    
+                    del self.bot_opened_trades[pair]
                     
             return closed_trades
         except Exception as e:
@@ -665,6 +713,7 @@ Return ONLY JSON format below after completing all thinking steps:
                     self.print_color(f"{direction_icon} {pair}", self.Fore.WHITE)
                     self.print_color(f"   📍 Entry: ${trade['entry_price']:.4f} | Current: ${current_price:.4f}", self.Fore.WHITE)
                     self.print_color(f"   💰 P&L: ${pnl:.2f}", pnl_color)
+                    self.print_color(f"   🎯 TP: ${trade['take_profit']:.4f} | 🛑 SL: ${trade['stop_loss']:.4f}", self.Fore.CYAN)
 
     def run_trading_cycle(self):
         try:
@@ -677,6 +726,11 @@ Return ONLY JSON format below after completing all thinking steps:
             
             # Display current status
             self.display_status()
+            
+            # Show statistics every 5 cycles
+            if hasattr(self, 'cycle_count') and self.cycle_count % 5 == 0:
+                self.show_trading_stats()
+                self.show_trade_history(5)
             
             # Look for new trading opportunities
             self.print_color(f"\n🔍 SCANNING FOR NEW SETUPS...", self.Fore.MAGENTA + self.Style.BRIGHT)
@@ -700,17 +754,21 @@ Return ONLY JSON format below after completing all thinking steps:
             self.print_color(f"❌ Trading cycle error: {e}", self.Fore.RED)
 
     def start_trading(self):
-        self.print_color("🚀 SMART AI TRADING BOT WITH DEEP THINKING STARTED!", self.Fore.GREEN + self.Style.BRIGHT)
-        self.print_color("💰 Trade Size: $50 | Leverage: 5x", self.Fore.CYAN)
+        mode = "REAL" if self.binance else "PAPER"
+        self.print_color(f"🚀 SMART AI TRADING BOT WITH DEEP THINKING STARTED!", self.Fore.GREEN + self.Style.BRIGHT)
+        self.print_color(f"💰 Trade Size: $50 | Leverage: 5x | Mode: {mode}", self.Fore.CYAN)
         self.print_color("📈 Timeframe: 15 Minutes | AI Controlled", self.Fore.MAGENTA)
         self.print_color("🎯 Pairs: SOL, XRP, LINK, DOGE, SUI", self.Fore.YELLOW)
         self.print_color("🧠 Mode: DEEP THINKING ANALYSIS", self.Fore.BLUE + self.Style.BRIGHT)
         
-        cycle_count = 0
+        if not self.binance:
+            self.print_color(f"💰 Starting Paper Balance: ${self.paper_balance}", self.Fore.CYAN)
+        
+        self.cycle_count = 0
         while True:
             try:
-                cycle_count += 1
-                self.print_color(f"\n🔄 CYCLE {cycle_count}", self.Fore.BLUE + self.Style.BRIGHT)
+                self.cycle_count += 1
+                self.print_color(f"\n🔄 CYCLE {self.cycle_count}", self.Fore.BLUE + self.Style.BRIGHT)
                 self.print_color("=" * 40, self.Fore.BLUE)
                 
                 self.run_trading_cycle()
@@ -720,6 +778,8 @@ Return ONLY JSON format below after completing all thinking steps:
                 
             except KeyboardInterrupt:
                 self.print_color(f"\n🛑 TRADING BOT STOPPED", self.Fore.RED + self.Style.BRIGHT)
+                self.show_trading_stats()
+                self.show_trade_history(10)
                 break
             except Exception as e:
                 self.print_color(f"❌ Error: {e}", self.Fore.RED)
@@ -734,6 +794,7 @@ if __name__ == "__main__":
         print("🤖 SMART AI TRADING BOT WITH DEEP THINKING")
         print("📊 15-MINUTE TIMEFRAME | DEEP THINKING ANALYSIS")
         print("🎯 AI CONTROLS: Entry, TP, SL, Analysis")
+        print("💾 AUTO-SAVE: Paper & Real Trading History")
         print("="*60)
         
         bot.start_trading()
