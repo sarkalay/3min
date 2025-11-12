@@ -78,7 +78,6 @@ class FullyAutonomous1HourAITrader:
         
         # NEW: Reverse position settings
         self.allow_reverse_positions = True  # Enable reverse position feature
-        self.reverse_position_threshold = -2.0  # -2% PnL ဆိုရင် reverse စဉ်းစား
         
         # Initialize Binance client
         try:
@@ -86,9 +85,8 @@ class FullyAutonomous1HourAITrader:
             self.print_color(f"🤖 FULLY AUTONOMOUS 1HOUR AI TRADER ACTIVATED! 🤖", self.Fore.CYAN + self.Style.BRIGHT)
             self.print_color(f"💰 TOTAL BUDGET: ${self.total_budget}", self.Fore.GREEN + self.Style.BRIGHT)
             self.print_color(f"🔄 REVERSE POSITION FEATURE: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.print_color(f"🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
             self.print_color(f"⏰ Timeframe: 1HOUR | Max Positions: {self.max_concurrent_trades}", self.Fore.YELLOW + self.Style.BRIGHT)
-            self.print_color(f"📈 Pairs: {len(self.available_pairs)} selected", self.Fore.BLUE + self.Style.BRIGHT)
-            self.print_color(f"⚡ Leverage Range: 10x to 30x", self.Fore.RED + self.Style.BRIGHT)
         except Exception as e:
             self.print_color(f"Binance initialization failed: {e}", self.Fore.RED)
             self.binance = None
@@ -214,12 +212,6 @@ class FullyAutonomous1HourAITrader:
         except Exception as e:
             self.print_color(f"Error loading symbol precision: {e}", self.Fore.RED)
 
-    def format_price(self, pair, price):
-        if price <= 0:
-            return 0.0
-        precision = self.price_precision.get(pair, 4)
-        return round(price, precision)
-
     def get_market_news_sentiment(self):
         """Get recent cryptocurrency news sentiment"""
         try:
@@ -260,21 +252,23 @@ class FullyAutonomous1HourAITrader:
             - Support/Resistance Levels: {market_data.get('support_levels', [])} / {market_data.get('resistance_levels', [])}
             {reverse_analysis}
 
+            IMPORTANT: NO TP/SL ORDERS WILL BE SET!
+            - You must manually monitor and close positions
+            - Consider market conditions for entry AND exit
+            - Close positions based on trend changes, not fixed levels
+
             REVERSE POSITION STRATEGY:
-            - If existing position is losing >2% and market trend reversed, consider REVERSE
+            - If existing position is losing and market trend reversed, consider REVERSE
             - Close current position and open opposite direction immediately
-            - Only reverse when technical analysis strongly supports trend change
 
             Return VALID JSON only:
             {{
                 "decision": "LONG" | "SHORT" | "HOLD" | "REVERSE_LONG" | "REVERSE_SHORT",
                 "position_size_usd": number,
                 "entry_price": number,
-                "take_profit": number,
-                "stop_loss": number,
                 "leverage": number (10-30),
                 "confidence": 0-100,
-                "reasoning": "analysis including reverse position consideration"
+                "reasoning": "analysis including when to manually close based on market conditions"
             }}
 
             REVERSE Decisions meaning:
@@ -292,7 +286,7 @@ class FullyAutonomous1HourAITrader:
             data = {
                 "model": "deepseek/deepseek-chat-v3.1",
                 "messages": [
-                    {"role": "system", "content": "You are a fully autonomous AI trader with reverse position capability. Analyze market conditions and decide whether to hold, open new position, or reverse existing position based on trend changes."},
+                    {"role": "system", "content": "You are a fully autonomous AI trader with reverse position capability. You manually close positions based on market conditions - no TP/SL orders are set. Analyze when to enter AND when to exit based on technical analysis."},
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.3,
@@ -325,8 +319,6 @@ class FullyAutonomous1HourAITrader:
                 decision = decision_data.get('decision', 'HOLD').upper()
                 position_size_usd = float(decision_data.get('position_size_usd', 0))
                 entry_price = float(decision_data.get('entry_price', 0))
-                take_profit = float(decision_data.get('take_profit', 0))
-                stop_loss = float(decision_data.get('stop_loss', 0))
                 leverage = int(decision_data.get('leverage', 10))
                 confidence = float(decision_data.get('confidence', 50))
                 reasoning = decision_data.get('reasoning', 'AI Analysis')
@@ -344,8 +336,6 @@ class FullyAutonomous1HourAITrader:
                     "decision": decision,
                     "position_size_usd": position_size_usd,
                     "entry_price": entry_price,
-                    "take_profit": take_profit,
-                    "stop_loss": stop_loss,
                     "leverage": leverage,
                     "confidence": confidence,
                     "reasoning": reasoning,
@@ -362,8 +352,6 @@ class FullyAutonomous1HourAITrader:
             "decision": "HOLD",
             "position_size_usd": 0,
             "entry_price": market_data['current_price'],
-            "take_profit": 0,
-            "stop_loss": 0,
             "leverage": 10,
             "confidence": 0,
             "reasoning": "Fallback: AI analysis unavailable",
@@ -415,7 +403,7 @@ class FullyAutonomous1HourAITrader:
         """Close trade immediately at market price"""
         try:
             if self.binance:
-                # Cancel existing TP/SL orders first
+                # Cancel any existing orders first
                 try:
                     open_orders = self.binance.futures_get_open_orders(symbol=pair)
                     for order in open_orders:
@@ -590,13 +578,11 @@ class FullyAutonomous1HourAITrader:
         return True, "OK"
 
     def execute_ai_trade(self, pair, ai_decision):
-        """Execute trade with REVERSE position support"""
+        """Execute trade WITHOUT TP/SL orders - AI will close manually"""
         try:
             decision = ai_decision["decision"]
             position_size_usd = ai_decision["position_size_usd"]
             entry_price = ai_decision["entry_price"]
-            take_profit = ai_decision["take_profit"]
-            stop_loss = ai_decision["stop_loss"]
             leverage = ai_decision["leverage"]
             confidence = ai_decision["confidence"]
             reasoning = ai_decision["reasoning"]
@@ -632,28 +618,23 @@ class FullyAutonomous1HourAITrader:
             if quantity is None:
                 return False
             
-            # Format prices
-            take_profit = self.format_price(pair, take_profit)
-            stop_loss = self.format_price(pair, stop_loss)
-            
-            # Display AI trade decision
+            # Display AI trade decision (NO TP/SL)
             direction_color = self.Fore.GREEN + self.Style.BRIGHT if decision == 'LONG' else self.Fore.RED + self.Style.BRIGHT
             direction_icon = "🟢 LONG" if decision == 'LONG' else "🔴 SHORT"
             
-            self.print_color(f"\n🤖 DEEPSEEK TRADE EXECUTION", self.Fore.CYAN + self.Style.BRIGHT)
+            self.print_color(f"\n🤖 DEEPSEEK TRADE EXECUTION (NO TP/SL)", self.Fore.CYAN + self.Style.BRIGHT)
             self.print_color("=" * 80, self.Fore.CYAN)
             self.print_color(f"{direction_icon} {pair}", direction_color)
             self.print_color(f"POSITION SIZE: ${position_size_usd:.2f}", self.Fore.GREEN + self.Style.BRIGHT)
             self.print_color(f"LEVERAGE: {leverage}x ⚡", self.Fore.RED + self.Style.BRIGHT)
             self.print_color(f"ENTRY PRICE: ${entry_price:.4f}", self.Fore.WHITE)
             self.print_color(f"QUANTITY: {quantity}", self.Fore.CYAN)
-            self.print_color(f"TAKE PROFIT: ${take_profit:.4f}", self.Fore.GREEN)
-            self.print_color(f"STOP LOSS: ${stop_loss:.4f}", self.Fore.RED)
+            self.print_color(f"🎯 NO TP/SL SET - AI WILL CLOSE MANUALLY BASED ON MARKET", self.Fore.YELLOW + self.Style.BRIGHT)
             self.print_color(f"CONFIDENCE: {confidence}%", self.Fore.YELLOW + self.Style.BRIGHT)
             self.print_color(f"REASONING: {reasoning}", self.Fore.WHITE)
             self.print_color("=" * 80, self.Fore.CYAN)
             
-            # Execute live trade
+            # Execute live trade WITHOUT TP/SL orders
             if self.binance:
                 entry_side = 'BUY' if decision == 'LONG' else 'SELL'
                 
@@ -663,7 +644,7 @@ class FullyAutonomous1HourAITrader:
                 except Exception as e:
                     self.print_color(f"Leverage change failed: {e}", self.Fore.YELLOW)
                 
-                # Execute order
+                # Execute order ONLY - no TP/SL orders
                 order = self.binance.futures_create_order(
                     symbol=pair,
                     side=entry_side,
@@ -671,28 +652,7 @@ class FullyAutonomous1HourAITrader:
                     quantity=quantity
                 )
                 
-                # Set stop loss and take profit with 1:3 risk-reward
-                stop_side = 'SELL' if decision == 'LONG' else 'BUY'
-                
-                # Calculate 1:3 risk-reward based on entry and stop loss
-                risk = abs(entry_price - stop_loss)
-                reward = risk * 3
-                if decision == 'LONG':
-                    calculated_tp = entry_price + reward
-                else:
-                    calculated_tp = entry_price - reward
-                
-                # Use the better TP (AI's TP or calculated 1:3 TP)
-                final_tp = max(take_profit, calculated_tp) if decision == 'LONG' else min(take_profit, calculated_tp)
-                
-                self.binance.futures_create_order(
-                    symbol=pair, side=stop_side, type='STOP_MARKET',
-                    quantity=quantity, stopPrice=stop_loss, reduceOnly=True
-                )
-                self.binance.futures_create_order(
-                    symbol=pair, side=stop_side, type='TAKE_PROFIT_MARKET',
-                    quantity=quantity, stopPrice=final_tp, reduceOnly=True
-                )
+                # ❌❌❌ NO TP/SL ORDERS CREATED ❌❌❌
             
             # Update budget and track trade
             self.available_budget -= position_size_usd
@@ -703,195 +663,141 @@ class FullyAutonomous1HourAITrader:
                 "entry_price": entry_price,
                 "quantity": quantity,
                 "position_size_usd": position_size_usd,
-                "stop_loss": stop_loss,
-                "take_profit": take_profit,
                 "leverage": leverage,
                 "entry_time": time.time(),
                 "status": 'ACTIVE',
                 'ai_confidence': confidence,
                 'ai_reasoning': reasoning,
-                'entry_time_th': self.get_thailand_time()
+                'entry_time_th': self.get_thailand_time(),
+                'has_tp_sl': False  # NEW: Mark as no TP/SL
             }
             
-            self.print_color(f"✅ TRADE EXECUTED: {pair} {decision} | Leverage: {leverage}x", self.Fore.GREEN + self.Style.BRIGHT)
+            self.print_color(f"✅ TRADE EXECUTED (NO TP/SL): {pair} {decision} | Leverage: {leverage}x", self.Fore.GREEN + self.Style.BRIGHT)
+            self.print_color(f"📊 AI will monitor and close manually based on market conditions", self.Fore.BLUE)
             return True
             
         except Exception as e:
             self.print_color(f"❌ Trade execution failed: {e}", self.Fore.RED)
             return False
 
+    def get_ai_close_decision(self, pair, trade):
+        """Ask AI whether to close this position based on market conditions"""
+        try:
+            current_price = self.get_current_price(pair)
+            market_data = self.get_price_history(pair)
+            current_pnl = self.calculate_current_pnl(trade, current_price)
+            
+            prompt = f"""
+            SHOULD WE CLOSE THIS POSITION?
+            
+            CURRENT ACTIVE TRADE:
+            - Pair: {pair}
+            - Direction: {trade['direction']}
+            - Entry Price: ${trade['entry_price']:.4f}
+            - Current Price: ${current_price:.4f}
+            - PnL: {current_pnl:.2f}%
+            - Position Size: ${trade['position_size_usd']:.2f}
+            - Leverage: {trade['leverage']}x
+            - Trade Age: {(time.time() - trade['entry_time']) / 3600:.1f} hours
+            
+            MARKET CONDITIONS:
+            - 1H Change: {market_data.get('price_change', 0):.2f}%
+            - Support: {market_data.get('support_levels', [])}
+            - Resistance: {market_data.get('resistance_levels', [])}
+            - Current Trend: {'BULLISH' if market_data.get('price_change', 0) > 0 else 'BEARISH'}
+            
+            Should we CLOSE this position now?
+            Consider:
+            - Profit/loss situation
+            - Trend changes and momentum
+            - Technical indicators
+            - Market sentiment
+            - Risk management
+            - Time in trade
+            
+            Return JSON:
+            {{
+                "should_close": true/false,
+                "close_reason": "TAKE_PROFIT" | "STOP_LOSS" | "TREND_REVERSAL" | "TIME_EXIT" | "MARKET_CONDITION",
+                "confidence": 0-100,
+                "reasoning": "Detailed technical analysis for close decision"
+            }}
+            """
+            
+            headers = {
+                "Authorization": f"Bearer {self.openrouter_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com",
+                "X-Title": "Fully Autonomous 1Hour AI Trader"
+            }
+            
+            data = {
+                "model": "deepseek/deepseek-chat-v3.1",
+                "messages": [
+                    {"role": "system", "content": "You are an AI trader monitoring active positions. Decide whether to close positions based on current market conditions, technical analysis, and risk management. Provide clear reasoning for your close decisions."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 600
+            }
+            
+            response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=45)
+            
+            if response.status_code == 200:
+                result = response.json()
+                ai_response = result['choices'][0]['message']['content'].strip()
+                
+                # Parse AI response
+                json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group()
+                    close_decision = json.loads(json_str)
+                    return close_decision
+                    
+            return {"should_close": False, "close_reason": "AI_UNAVAILABLE", "confidence": 0, "reasoning": "AI analysis failed"}
+            
+        except Exception as e:
+            self.print_color(f"AI close decision error: {e}", self.Fore.RED)
+            return {"should_close": False, "close_reason": "ERROR", "confidence": 0, "reasoning": f"Error: {e}"}
+
     def monitor_positions(self):
-        """Monitor and update open positions"""
+        """Monitor positions and ask AI when to close (NO TP/SL)"""
         try:
             closed_trades = []
             for pair, trade in list(self.ai_opened_trades.items()):
                 if trade['status'] != 'ACTIVE':
                     continue
                 
-                if self.binance:
-                    live_data = self.get_live_position_data(pair)
-                    if not live_data:
-                        # Position closed
-                        self.close_trade_with_cleanup(pair, trade, "AUTO CLOSE")
-                        closed_trades.append(pair)
-                        continue
-                else:
-                    # Paper trading - check TP/SL
-                    current_price = self.get_current_price(pair)
-                    if self.check_paper_tp_sl(pair, trade, current_price):
-                        closed_trades.append(pair)
+                # NEW: Ask AI whether to close this position (for positions without TP/SL)
+                if not trade.get('has_tp_sl', True):
+                    self.print_color(f"🔍 Checking if AI wants to close {pair}...", self.Fore.BLUE)
+                    close_decision = self.get_ai_close_decision(pair, trade)
                     
-            return closed_trades
+                    if close_decision.get("should_close", False):
+                        close_reason = close_decision.get("close_reason", "AI_DECISION")
+                        confidence = close_decision.get("confidence", 0)
+                        reasoning = close_decision.get("reasoning", "No reason provided")
+                        
+                        self.print_color(f"🎯 AI Decision: CLOSE {pair} (Confidence: {confidence}%)", self.Fore.YELLOW + self.Style.BRIGHT)
+                        self.print_color(f"📝 Reason: {reasoning}", self.Fore.WHITE)
+                        
+                        success = self.close_trade_immediately(pair, trade, f"AI_CLOSE: {close_reason}")
+                        if success:
+                            closed_trades.append(pair)
+                    else:
+                        # Show AI's decision to hold
+                        if close_decision.get('confidence', 0) > 0:
+                            self.print_color(f"🔍 AI wants to HOLD {pair} (Confidence: {close_decision.get('confidence', 0)}%)", self.Fore.GREEN)
+                    
         except Exception as e:
             self.print_color(f"Monitoring error: {e}", self.Fore.RED)
-            return []
-
-    def check_paper_tp_sl(self, pair, trade, current_price):
-        """Check if paper trade hit TP/SL"""
-        try:
-            should_close = False
-            close_reason = ""
-            pnl = 0
-            
-            if trade['direction'] == 'LONG':
-                if current_price >= trade['take_profit']:
-                    should_close = True
-                    close_reason = "TP HIT"
-                    pnl = (current_price - trade['entry_price']) * trade['quantity']
-                elif current_price <= trade['stop_loss']:
-                    should_close = True
-                    close_reason = "SL HIT" 
-                    pnl = (current_price - trade['entry_price']) * trade['quantity']
-            else:
-                if current_price <= trade['take_profit']:
-                    should_close = True
-                    close_reason = "TP HIT"
-                    pnl = (trade['entry_price'] - current_price) * trade['quantity']
-                elif current_price >= trade['stop_loss']:
-                    should_close = True
-                    close_reason = "SL HIT"
-                    pnl = (trade['entry_price'] - current_price) * trade['quantity']
-            
-            if should_close:
-                self.close_paper_trade(pair, trade, close_reason, current_price, pnl)
-                return True
-            return False
-                    
-        except Exception as e:
-            self.print_color(f"Paper TP/SL check failed: {e}", self.Fore.RED)
-            return False
-
-    def close_paper_trade(self, pair, trade, close_reason, current_price, pnl):
-        """Close paper trade"""
-        try:
-            trade['status'] = 'CLOSED'
-            trade['exit_price'] = current_price
-            trade['pnl'] = pnl
-            trade['close_reason'] = close_reason
-            trade['close_time'] = self.get_thailand_time()
-            
-            # Return used budget plus P&L
-            self.available_budget += trade['position_size_usd'] + pnl
-            
-            self.add_trade_to_history(trade.copy())
-            
-            pnl_color = self.Fore.GREEN + self.Style.BRIGHT if pnl > 0 else self.Fore.RED + self.Style.BRIGHT
-            direction_icon = "🟢 LONG" if trade['direction'] == 'LONG' else "🔴 SHORT"
-            self.print_color(f"\n🔚 PAPER TRADE CLOSED: {pair} {direction_icon}", pnl_color)
-            self.print_color(f"   Leverage: {trade['leverage']}x | P&L: ${pnl:.2f} | Reason: {close_reason}", pnl_color)
-            self.print_color(f"   New Available Budget: ${self.available_budget:.2f}", self.Fore.CYAN)
-            
-            del self.ai_opened_trades[pair]
-            
-        except Exception as e:
-            self.print_color(f"Paper trade close failed: {e}", self.Fore.RED)
-
-    def close_trade_with_cleanup(self, pair, trade, close_reason="MANUAL"):
-        """Close real trade with cleanup"""
-        try:
-            if self.binance:
-                # Cancel existing orders
-                open_orders = self.binance.futures_get_open_orders(symbol=pair)
-                canceled = 0
-                for order in open_orders:
-                    if order['reduceOnly'] and order['symbol'] == pair:
-                        try:
-                            self.binance.futures_cancel_order(symbol=pair, orderId=order['orderId'])
-                            canceled += 1
-                        except: pass
-            
-            final_pnl = self.get_final_pnl(pair, trade)
-            trade['status'] = 'CLOSED'
-            trade['exit_time_th'] = self.get_thailand_time()
-            trade['exit_price'] = self.get_current_price(pair)
-            trade['pnl'] = final_pnl
-            trade['close_reason'] = close_reason
-            
-            # Return used budget plus P&L
-            self.available_budget += trade['position_size_usd'] + final_pnl
-            
-            self.add_trade_to_history(trade.copy())
-            
-            pnl_color = self.Fore.GREEN + self.Style.BRIGHT if final_pnl > 0 else self.Fore.RED + self.Style.BRIGHT
-            direction_icon = "🟢 LONG" if trade['direction'] == 'LONG' else "🔴 SHORT"
-            self.print_color(f"\n🔚 TRADE CLOSED: {pair} {direction_icon}", pnl_color)
-            self.print_color(f"   Leverage: {trade['leverage']}x | Final P&L: ${final_pnl:.2f} | Reason: {close_reason}", pnl_color)
-            self.print_color(f"   Available Budget: ${self.available_budget:.2f}", self.Fore.CYAN)
-                
-            del self.ai_opened_trades[pair]
-            
-        except Exception as e:
-            self.print_color(f"Cleanup failed for {pair}: {e}", self.Fore.RED)
-
-    def get_final_pnl(self, pair, trade):
-        """Calculate final P&L for trade"""
-        try:
-            if self.binance:
-                live = self.get_live_position_data(pair)
-                if live and 'unrealized_pnl' in live:
-                    return live['unrealized_pnl']
-            current = self.get_current_price(pair)
-            if not current:
-                return 0
-            if trade['direction'] == 'LONG':
-                return (current - trade['entry_price']) * trade['quantity']
-            else:
-                return (trade['entry_price'] - current) * trade['quantity']
-        except:
-            return 0
-
-    def get_live_position_data(self, pair):
-        """Get live position data from Binance"""
-        try:
-            if not self.binance:
-                return None
-                
-            positions = self.binance.futures_position_information(symbol=pair)
-            for pos in positions:
-                if pos['symbol'] == pair and float(pos['positionAmt']) != 0:
-                    entry_price = float(pos.get('entryPrice', 0))
-                    quantity = abs(float(pos['positionAmt']))
-                    unrealized_pnl = float(pos.get('unRealizedProfit', 0))
-                    ticker = self.binance.futures_symbol_ticker(symbol=pair)
-                    current_price = float(ticker['price'])
-                    direction = "SHORT" if pos['positionAmt'].startswith('-') else "LONG"
-                    return {
-                        'direction': direction,
-                        'entry_price': entry_price,
-                        'quantity': quantity,
-                        'current_price': current_price,
-                        'unrealized_pnl': unrealized_pnl,
-                        'status': 'ACTIVE'
-                    }
-            return None
-        except Exception as e:
-            self.print_color(f"Error getting live data: {e}", self.Fore.RED)
-            return None
+        return []
 
     def display_dashboard(self):
         """Display trading dashboard"""
         self.print_color(f"\n🤖 AI TRADING DASHBOARD - {self.get_thailand_time()}", self.Fore.CYAN + self.Style.BRIGHT)
         self.print_color("=" * 90, self.Fore.CYAN)
+        self.print_color(f"🎯 MODE: NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
         
         active_count = 0
         total_unrealized = 0
@@ -915,7 +821,7 @@ class FullyAutonomous1HourAITrader:
                 self.print_color(f"   Size: ${trade['position_size_usd']:.2f} | Leverage: {trade['leverage']}x ⚡", self.Fore.WHITE)
                 self.print_color(f"   Entry: ${trade['entry_price']:.4f} | Current: ${current_price:.4f}", self.Fore.WHITE)
                 self.print_color(f"   P&L: ${unrealized_pnl:.2f}", pnl_color)
-                self.print_color(f"   TP: ${trade['take_profit']:.4f} | SL: ${trade['stop_loss']:.4f}", self.Fore.YELLOW)
+                self.print_color(f"   🎯 NO TP/SL - AI Monitoring", self.Fore.YELLOW)
                 self.print_color("   " + "-" * 60, self.Fore.CYAN)
         
         if active_count == 0:
@@ -961,9 +867,9 @@ class FullyAutonomous1HourAITrader:
         self.print_color(f"Available Budget: ${self.available_budget:.2f}", self.Fore.CYAN + self.Style.BRIGHT)
 
     def run_trading_cycle(self):
-        """Run trading cycle with REVERSE position checking"""
+        """Run trading cycle with REVERSE position checking and AI manual close"""
         try:
-            # First monitor and close positions that hit TP/SL
+            # First monitor and ask AI to close positions
             self.monitor_positions()
             self.display_dashboard()
             
@@ -979,7 +885,7 @@ class FullyAutonomous1HourAITrader:
                 if self.available_budget > 100:
                     market_data = self.get_price_history(pair)
                     
-                    # NEW: Pass current trade to AI for reverse analysis
+                    # Pass current trade to AI for reverse analysis
                     current_trade = self.ai_opened_trades.get(pair)
                     ai_decision = self.get_ai_trading_decision(pair, market_data, current_trade)
                     
@@ -1004,11 +910,12 @@ class FullyAutonomous1HourAITrader:
             self.print_color(f"Trading cycle error: {e}", self.Fore.RED)
 
     def start_trading(self):
-        """Start trading with REVERSE position feature"""
+        """Start trading with REVERSE position feature and NO TP/SL"""
         self.print_color("🚀 STARTING AI TRADER WITH REVERSE POSITION FEATURE!", self.Fore.CYAN + self.Style.BRIGHT)
         self.print_color("💰 AI MANAGING $500 PORTFOLIO", self.Fore.GREEN + self.Style.BRIGHT)
         self.print_color("🔄 REVERSE POSITION: ENABLED (AI can flip losing positions)", self.Fore.MAGENTA + self.Style.BRIGHT)
-        self.print_color("⚡ LEVERAGE: 10x to 30x | RISK-REWARD: 1:3", self.Fore.RED + self.Style.BRIGHT)
+        self.print_color("🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
+        self.print_color("⚡ LEVERAGE: 10x to 30x", self.Fore.RED + self.Style.BRIGHT)
         
         self.cycle_count = 0
         while True:
@@ -1041,7 +948,6 @@ class FullyAutonomous1HourPaperTrader:
         
         # Copy reverse position settings
         self.allow_reverse_positions = True
-        self.reverse_position_threshold = -2.0
         
         self.paper_balance = 500  # Virtual $500 budget
         self.available_budget = 500
@@ -1052,6 +958,7 @@ class FullyAutonomous1HourPaperTrader:
         self.real_bot.print_color("🤖 FULLY AUTONOMOUS 1HOUR PAPER TRADER INITIALIZED!", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color(f"💰 Virtual Budget: ${self.paper_balance}", self.Fore.CYAN + self.Style.BRIGHT)
         self.real_bot.print_color(f"🔄 REVERSE POSITION FEATURE: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
+        self.real_bot.print_color(f"🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
         self.real_bot.print_color(f"⏰ 1HOUR Timeframe | Leverage: 10x to 30x ⚡", self.Fore.YELLOW + self.Style.BRIGHT)
         
     def load_paper_history(self):
@@ -1156,14 +1063,83 @@ class FullyAutonomous1HourPaperTrader:
             self.real_bot.print_color(f"❌ PAPER: Immediate close failed: {e}", self.Fore.RED)
             return False
 
+    def get_ai_close_decision(self, pair, trade):
+        """Ask AI whether to close paper position"""
+        try:
+            current_price = self.real_bot.get_current_price(pair)
+            market_data = self.real_bot.get_price_history(pair)
+            current_pnl = self.calculate_current_pnl(trade, current_price)
+            
+            prompt = f"""
+            SHOULD WE CLOSE THIS PAPER TRADING POSITION?
+            
+            CURRENT ACTIVE PAPER TRADE:
+            - Pair: {pair}
+            - Direction: {trade['direction']}
+            - Entry Price: ${trade['entry_price']:.4f}
+            - Current Price: ${current_price:.4f}
+            - PnL: {current_pnl:.2f}%
+            - Position Size: ${trade['position_size_usd']:.2f}
+            - Leverage: {trade['leverage']}x
+            - Trade Age: {(time.time() - trade['entry_time']) / 3600:.1f} hours
+            
+            MARKET CONDITIONS:
+            - 1H Change: {market_data.get('price_change', 0):.2f}%
+            - Support: {market_data.get('support_levels', [])}
+            - Resistance: {market_data.get('resistance_levels', [])}
+            
+            Should we CLOSE this paper position now?
+            
+            Return JSON:
+            {{
+                "should_close": true/false,
+                "close_reason": "TAKE_PROFIT" | "STOP_LOSS" | "TREND_REVERSAL" | "TIME_EXIT",
+                "confidence": 0-100,
+                "reasoning": "Detailed analysis"
+            }}
+            """
+            
+            headers = {
+                "Authorization": f"Bearer {self.real_bot.openrouter_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com",
+                "X-Title": "Fully Autonomous 1Hour AI Paper Trader"
+            }
+            
+            data = {
+                "model": "deepseek/deepseek-chat-v3.1",
+                "messages": [
+                    {"role": "system", "content": "You are an AI paper trader monitoring active positions. Decide whether to close paper positions based on current market conditions and technical analysis."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 600
+            }
+            
+            response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=45)
+            
+            if response.status_code == 200:
+                result = response.json()
+                ai_response = result['choices'][0]['message']['content'].strip()
+                
+                json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group()
+                    close_decision = json.loads(json_str)
+                    return close_decision
+                    
+            return {"should_close": False, "close_reason": "AI_UNAVAILABLE", "confidence": 0, "reasoning": "AI analysis failed"}
+            
+        except Exception as e:
+            self.real_bot.print_color(f"PAPER: AI close decision error: {e}", self.Fore.RED)
+            return {"should_close": False, "close_reason": "ERROR", "confidence": 0, "reasoning": f"Error: {e}"}
+
     def paper_execute_trade(self, pair, ai_decision):
-        """Execute paper trade with REVERSE position support"""
+        """Execute paper trade WITHOUT TP/SL orders"""
         try:
             decision = ai_decision["decision"]
             position_size_usd = ai_decision["position_size_usd"]
             entry_price = ai_decision["entry_price"]
-            take_profit = ai_decision["take_profit"]
-            stop_loss = ai_decision["stop_loss"]
             leverage = ai_decision["leverage"]
             confidence = ai_decision["confidence"]
             reasoning = ai_decision["reasoning"]
@@ -1199,23 +1175,18 @@ class FullyAutonomous1HourPaperTrader:
             quantity = notional_value / entry_price
             quantity = round(quantity, 3)
             
-            # Format prices
-            take_profit = round(take_profit, 4)
-            stop_loss = round(stop_loss, 4)
-            
-            # Display AI trade decision
+            # Display AI trade decision (NO TP/SL)
             direction_color = self.Fore.GREEN + self.Style.BRIGHT if decision == 'LONG' else self.Fore.RED + self.Style.BRIGHT
             direction_icon = "🟢 LONG" if decision == 'LONG' else "🔴 SHORT"
             
-            self.real_bot.print_color(f"\n🤖 PAPER TRADE EXECUTION", self.Fore.CYAN + self.Style.BRIGHT)
+            self.real_bot.print_color(f"\n🤖 PAPER TRADE EXECUTION (NO TP/SL)", self.Fore.CYAN + self.Style.BRIGHT)
             self.real_bot.print_color("=" * 80, self.Fore.CYAN)
             self.real_bot.print_color(f"{direction_icon} {pair}", direction_color)
             self.real_bot.print_color(f"POSITION SIZE: ${position_size_usd:.2f}", self.Fore.GREEN + self.Style.BRIGHT)
             self.real_bot.print_color(f"LEVERAGE: {leverage}x ⚡", self.Fore.RED + self.Style.BRIGHT)
             self.real_bot.print_color(f"ENTRY PRICE: ${entry_price:.4f}", self.Fore.WHITE)
             self.real_bot.print_color(f"QUANTITY: {quantity}", self.Fore.CYAN)
-            self.real_bot.print_color(f"TAKE PROFIT: ${take_profit:.4f}", self.Fore.GREEN)
-            self.real_bot.print_color(f"STOP LOSS: ${stop_loss:.4f}", self.Fore.RED)
+            self.real_bot.print_color(f"🎯 NO TP/SL SET - AI WILL CLOSE MANUALLY", self.Fore.YELLOW + self.Style.BRIGHT)
             self.real_bot.print_color(f"CONFIDENCE: {confidence}%", self.Fore.YELLOW + self.Style.BRIGHT)
             self.real_bot.print_color(f"REASONING: {reasoning}", self.Fore.WHITE)
             self.real_bot.print_color("=" * 80, self.Fore.CYAN)
@@ -1229,17 +1200,16 @@ class FullyAutonomous1HourPaperTrader:
                 "entry_price": entry_price,
                 "quantity": quantity,
                 "position_size_usd": position_size_usd,
-                "stop_loss": stop_loss,
-                "take_profit": take_profit,
                 "leverage": leverage,
                 "entry_time": time.time(),
                 "status": 'ACTIVE',
                 'ai_confidence': confidence,
                 'ai_reasoning': reasoning,
-                'entry_time_th': self.real_bot.get_thailand_time()
+                'entry_time_th': self.real_bot.get_thailand_time(),
+                'has_tp_sl': False  # Mark as no TP/SL
             }
             
-            self.real_bot.print_color(f"✅ PAPER TRADE EXECUTED: {pair} {decision} | Leverage: {leverage}x", self.Fore.GREEN + self.Style.BRIGHT)
+            self.real_bot.print_color(f"✅ PAPER TRADE EXECUTED (NO TP/SL): {pair} {decision} | Leverage: {leverage}x", self.Fore.GREEN + self.Style.BRIGHT)
             return True
             
         except Exception as e:
@@ -1247,58 +1217,33 @@ class FullyAutonomous1HourPaperTrader:
             return False
 
     def monitor_paper_positions(self):
-        """Monitor paper positions for TP/SL"""
+        """Monitor paper positions and ask AI when to close"""
         try:
             closed_positions = []
             for pair, trade in list(self.paper_positions.items()):
                 if trade['status'] != 'ACTIVE':
                     continue
                 
-                current_price = self.real_bot.get_current_price(pair)
-                should_close = False
-                close_reason = ""
-                pnl = 0
-                
-                if trade['direction'] == 'LONG':
-                    if current_price >= trade['take_profit']:
-                        should_close = True
-                        close_reason = "TP HIT"
-                        pnl = (current_price - trade['entry_price']) * trade['quantity']
-                    elif current_price <= trade['stop_loss']:
-                        should_close = True
-                        close_reason = "SL HIT" 
-                        pnl = (current_price - trade['entry_price']) * trade['quantity']
-                else:
-                    if current_price <= trade['take_profit']:
-                        should_close = True
-                        close_reason = "TP HIT"
-                        pnl = (trade['entry_price'] - current_price) * trade['quantity']
-                    elif current_price >= trade['stop_loss']:
-                        should_close = True
-                        close_reason = "SL HIT"
-                        pnl = (trade['entry_price'] - current_price) * trade['quantity']
-                
-                if should_close:
-                    trade['status'] = 'CLOSED'
-                    trade['exit_price'] = current_price
-                    trade['pnl'] = pnl
-                    trade['close_reason'] = close_reason
-                    trade['close_time'] = self.real_bot.get_thailand_time()
+                # Ask AI whether to close this paper position
+                if not trade.get('has_tp_sl', True):
+                    self.real_bot.print_color(f"🔍 PAPER: Checking if AI wants to close {pair}...", self.Fore.BLUE)
+                    close_decision = self.get_ai_close_decision(pair, trade)
                     
-                    # Return used budget plus P&L
-                    self.available_budget += trade['position_size_usd'] + pnl
-                    self.paper_balance = self.available_budget
-                    
-                    self.add_paper_trade_to_history(trade.copy())
-                    closed_positions.append(pair)
-                    
-                    pnl_color = self.Fore.GREEN + self.Style.BRIGHT if pnl > 0 else self.Fore.RED + self.Style.BRIGHT
-                    direction_icon = "🟢 LONG" if trade['direction'] == 'LONG' else "🔴 SHORT"
-                    self.real_bot.print_color(f"\n🔚 PAPER TRADE CLOSED: {pair} {direction_icon}", pnl_color)
-                    self.real_bot.print_color(f"   Leverage: {trade['leverage']}x | P&L: ${pnl:.2f} | Reason: {close_reason}", pnl_color)
-                    self.real_bot.print_color(f"   New Available Budget: ${self.available_budget:.2f}", self.Fore.CYAN)
-                    
-                    del self.paper_positions[pair]
+                    if close_decision.get("should_close", False):
+                        close_reason = close_decision.get("close_reason", "AI_DECISION")
+                        confidence = close_decision.get("confidence", 0)
+                        reasoning = close_decision.get("reasoning", "No reason provided")
+                        
+                        self.real_bot.print_color(f"🎯 PAPER AI Decision: CLOSE {pair} (Confidence: {confidence}%)", self.Fore.YELLOW + self.Style.BRIGHT)
+                        self.real_bot.print_color(f"📝 Reason: {reasoning}", self.Fore.WHITE)
+                        
+                        success = self.paper_close_trade_immediately(pair, trade, f"AI_CLOSE: {close_reason}")
+                        if success:
+                            closed_positions.append(pair)
+                    else:
+                        # Show AI's decision to hold
+                        if close_decision.get('confidence', 0) > 0:
+                            self.real_bot.print_color(f"🔍 PAPER AI wants to HOLD {pair} (Confidence: {close_decision.get('confidence', 0)}%)", self.Fore.GREEN)
                     
             return closed_positions
                     
@@ -1349,6 +1294,7 @@ class FullyAutonomous1HourPaperTrader:
         """Display paper trading dashboard"""
         self.real_bot.print_color(f"\n🤖 PAPER TRADING DASHBOARD - {self.real_bot.get_thailand_time()}", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color("=" * 90, self.Fore.GREEN)
+        self.real_bot.print_color(f"🎯 MODE: NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
         
         active_count = 0
         total_unrealized = 0
@@ -1372,7 +1318,7 @@ class FullyAutonomous1HourPaperTrader:
                 self.real_bot.print_color(f"   Size: ${trade['position_size_usd']:.2f} | Leverage: {trade['leverage']}x ⚡", self.Fore.WHITE)
                 self.real_bot.print_color(f"   Entry: ${trade['entry_price']:.4f} | Current: ${current_price:.4f}", self.Fore.WHITE)
                 self.real_bot.print_color(f"   P&L: ${unrealized_pnl:.2f}", pnl_color)
-                self.real_bot.print_color(f"   TP: ${trade['take_profit']:.4f} | SL: ${trade['stop_loss']:.4f}", self.Fore.YELLOW)
+                self.real_bot.print_color(f"   🎯 NO TP/SL - AI Monitoring", self.Fore.YELLOW)
                 self.real_bot.print_color("   " + "-" * 60, self.Fore.GREEN)
         
         if active_count == 0:
@@ -1382,7 +1328,7 @@ class FullyAutonomous1HourPaperTrader:
             self.real_bot.print_color(f"📊 Active Paper Positions: {active_count}/6 | Total Unrealized P&L: ${total_unrealized:.2f}", total_color)
 
     def run_paper_trading_cycle(self):
-        """Run one complete paper trading cycle with REVERSE feature"""
+        """Run one complete paper trading cycle with REVERSE feature and AI manual close"""
         try:
             self.monitor_paper_positions()
             self.display_paper_dashboard()
@@ -1426,10 +1372,11 @@ class FullyAutonomous1HourPaperTrader:
             self.real_bot.print_color(f"PAPER: Trading cycle error: {e}", self.Fore.RED)
 
     def start_paper_trading(self):
-        """Start paper trading with REVERSE feature"""
+        """Start paper trading with REVERSE feature and NO TP/SL"""
         self.real_bot.print_color("🚀 STARTING PAPER TRADING WITH REVERSE POSITION FEATURE!", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color("💰 VIRTUAL $500 BUDGET - NO REAL MONEY", self.Fore.CYAN + self.Style.BRIGHT)
         self.real_bot.print_color("🔄 REVERSE POSITION: ENABLED (AI can flip losing positions)", self.Fore.MAGENTA + self.Style.BRIGHT)
+        self.real_bot.print_color("🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
         self.real_bot.print_color("⏰ 1HOUR Timeframe | Leverage: 10x to 30x ⚡", self.Fore.YELLOW + self.Style.BRIGHT)
         
         self.paper_cycle_count = 0
@@ -1470,7 +1417,7 @@ if __name__ == "__main__":
         ai_trader = FullyAutonomous1HourAITrader()
         
         print("\n" + "="*80)
-        print("🤖 AI TRADER WITH REVERSE POSITION FEATURE")
+        print("🤖 AI TRADER WITH REVERSE POSITION FEATURE & NO TP/SL")
         print("="*80)
         print("SELECT MODE:")
         print("1. 🚀 Live Trading (Real Money)")
@@ -1481,9 +1428,10 @@ if __name__ == "__main__":
         if choice == "1":
             print("⚠️  WARNING: REAL MONEY TRADING! ⚠️")
             print("🔄 REVERSE POSITION FEATURE: ENABLED")
+            print("🎯 NO TP/SL - AI MANUAL CLOSE ONLY")
             print("⚡ AI CAN FLIP LOSING POSITIONS IMMEDIATELY")
-            confirm = input("Type 'REVERSE' to confirm: ").strip()
-            if confirm.upper() == 'REVERSE':
+            confirm = input("Type 'MANUALCLOSE' to confirm: ").strip()
+            if confirm.upper() == 'MANUALCLOSE':
                 ai_trader.start_trading()
             else:
                 print("Using Paper Trading mode instead...")
