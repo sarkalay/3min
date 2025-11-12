@@ -400,71 +400,79 @@ class FullyAutonomous1HourAITrader:
             return False
 
     def close_trade_immediately(self, pair, trade, reason="REVERSE"):
-        """Close trade immediately at market price"""
-        try:
-            if self.binance:
-                # Cancel any existing orders first
-                try:
-                    open_orders = self.binance.futures_get_open_orders(symbol=pair)
-                    for order in open_orders:
-                        if order['reduceOnly']:
-                            self.binance.futures_cancel_order(symbol=pair, orderId=order['orderId'])
-                except Exception as e:
-                    self.print_color(f"Order cancel warning: {e}", self.Fore.YELLOW)
-                
-                # Close position with market order
-                close_side = 'SELL' if trade['direction'] == 'LONG' else 'BUY'
-                order = self.binance.futures_create_order(
-                    symbol=pair,
-                    side=close_side,
-                    type='MARKET',
-                    quantity=abs(trade['quantity']),
-                    reduceOnly=True
-                )
-                
-                # Calculate final PnL
-                current_price = self.get_current_price(pair)
-                if trade['direction'] == 'LONG':
-                    pnl = (current_price - trade['entry_price']) * trade['quantity']
-                else:
-                    pnl = (trade['entry_price'] - current_price) * trade['quantity']
-                
-                # Update trade record
-                trade['status'] = 'CLOSED'
-                trade['exit_price'] = current_price
-                trade['pnl'] = pnl
-                trade['close_reason'] = reason
-                trade['close_time'] = self.get_thailand_time()
-                
-                # Return budget
-                self.available_budget += trade['position_size_usd'] + pnl
-                
-                self.add_trade_to_history(trade.copy())
-                self.print_color(f"✅ Position closed for reverse: {pair} | P&L: ${pnl:.2f}", self.Fore.CYAN)
-                
-                return True
+    """Close trade immediately at market price"""
+    try:
+        if self.binance:
+            # Cancel any existing orders first
+            try:
+                open_orders = self.binance.futures_get_open_orders(symbol=pair)
+                for order in open_orders:
+                    if order['reduceOnly']:
+                        self.binance.futures_cancel_order(symbol=pair, orderId=order['orderId'])
+            except Exception as e:
+                self.print_color(f"Order cancel warning: {e}", self.Fore.YELLOW)
+            
+            # Close position with market order
+            close_side = 'SELL' if trade['direction'] == 'LONG' else 'BUY'
+            order = self.binance.futures_create_order(
+                symbol=pair,
+                side=close_side,
+                type='MARKET',
+                quantity=abs(trade['quantity']),
+                reduceOnly=True
+            )
+            
+            # Calculate final PnL
+            current_price = self.get_current_price(pair)
+            if trade['direction'] == 'LONG':
+                pnl = (current_price - trade['entry_price']) * trade['quantity']
             else:
-                # Paper trading close
-                current_price = self.get_current_price(pair)
-                if trade['direction'] == 'LONG':
-                    pnl = (current_price - trade['entry_price']) * trade['quantity']
-                else:
-                    pnl = (trade['entry_price'] - current_price) * trade['quantity']
-                
-                trade['status'] = 'CLOSED'
-                trade['exit_price'] = current_price
-                trade['pnl'] = pnl
-                trade['close_reason'] = reason
-                trade['close_time'] = self.get_thailand_time()
-                
-                self.available_budget += trade['position_size_usd'] + pnl
-                self.add_trade_to_history(trade.copy())
-                
-                return True
-                
-        except Exception as e:
-            self.print_color(f"❌ Immediate close failed: {e}", self.Fore.RED)
-            return False
+                pnl = (trade['entry_price'] - current_price) * trade['quantity']
+            
+            # Update trade record
+            trade['status'] = 'CLOSED'
+            trade['exit_price'] = current_price
+            trade['pnl'] = pnl
+            trade['close_reason'] = reason
+            trade['close_time'] = self.get_thailand_time()
+            
+            # Return budget
+            self.available_budget += trade['position_size_usd'] + pnl
+            
+            self.add_trade_to_history(trade.copy())
+            self.print_color(f"✅ Position closed for reverse: {pair} | P&L: ${pnl:.2f}", self.Fore.CYAN)
+            
+            # 🔴🔴🔴 BUG FIX: Remove from active positions after closing 🔴🔴🔴
+            if pair in self.ai_opened_trades:
+                del self.ai_opened_trades[pair]
+            
+            return True
+        else:
+            # Paper trading close
+            current_price = self.get_current_price(pair)
+            if trade['direction'] == 'LONG':
+                pnl = (current_price - trade['entry_price']) * trade['quantity']
+            else:
+                pnl = (trade['entry_price'] - current_price) * trade['quantity']
+            
+            trade['status'] = 'CLOSED'
+            trade['exit_price'] = current_price
+            trade['pnl'] = pnl
+            trade['close_reason'] = reason
+            trade['close_time'] = self.get_thailand_time()
+            
+            self.available_budget += trade['position_size_usd'] + pnl
+            self.add_trade_to_history(trade.copy())
+            
+            # 🔴🔴🔴 BUG FIX: Remove from active positions after closing 🔴🔴🔴
+            if pair in self.ai_opened_trades:
+                del self.ai_opened_trades[pair]
+            
+            return True
+            
+    except Exception as e:
+        self.print_color(f"❌ Immediate close failed: {e}", self.Fore.RED)
+        return False
 
     def get_price_history(self, pair, limit=12):
         """Get 1hour price history with technical levels"""
@@ -1037,31 +1045,35 @@ class FullyAutonomous1HourPaperTrader:
             return False
 
     def paper_close_trade_immediately(self, pair, trade, reason="REVERSE"):
-        """Close paper trade immediately"""
-        try:
-            current_price = self.real_bot.get_current_price(pair)
-            if trade['direction'] == 'LONG':
-                pnl = (current_price - trade['entry_price']) * trade['quantity']
-            else:
-                pnl = (trade['entry_price'] - current_price) * trade['quantity']
+    """Close paper trade immediately"""
+    try:
+        current_price = self.real_bot.get_current_price(pair)
+        if trade['direction'] == 'LONG':
+            pnl = (current_price - trade['entry_price']) * trade['quantity']
+        else:
+            pnl = (trade['entry_price'] - current_price) * trade['quantity']
+        
+        trade['status'] = 'CLOSED'
+        trade['exit_price'] = current_price
+        trade['pnl'] = pnl
+        trade['close_reason'] = reason
+        trade['close_time'] = self.real_bot.get_thailand_time()
+        
+        self.available_budget += trade['position_size_usd'] + pnl
+        self.paper_balance = self.available_budget
+        
+        self.add_paper_trade_to_history(trade.copy())
+        self.real_bot.print_color(f"✅ PAPER: Position closed for reverse: {pair} | P&L: ${pnl:.2f}", self.Fore.CYAN)
+        
+        # 🔴🔴🔴 BUG FIX: Remove from active positions after closing 🔴🔴🔴
+        if pair in self.paper_positions:
+            del self.paper_positions[pair]
+        
+        return True
             
-            trade['status'] = 'CLOSED'
-            trade['exit_price'] = current_price
-            trade['pnl'] = pnl
-            trade['close_reason'] = reason
-            trade['close_time'] = self.real_bot.get_thailand_time()
-            
-            self.available_budget += trade['position_size_usd'] + pnl
-            self.paper_balance = self.available_budget
-            
-            self.add_paper_trade_to_history(trade.copy())
-            self.real_bot.print_color(f"✅ PAPER: Position closed for reverse: {pair} | P&L: ${pnl:.2f}", self.Fore.CYAN)
-            
-            return True
-                
-        except Exception as e:
-            self.real_bot.print_color(f"❌ PAPER: Immediate close failed: {e}", self.Fore.RED)
-            return False
+    except Exception as e:
+        self.real_bot.print_color(f"❌ PAPER: Immediate close failed: {e}", self.Fore.RED)
+        return False
 
     def get_ai_close_decision(self, pair, trade):
         """Ask AI whether to close paper position"""
