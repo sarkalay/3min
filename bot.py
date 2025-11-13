@@ -91,7 +91,7 @@ def _initialize_trading(self):
     # 🎯 FULLY AUTONOMOUS AI TRADING PARAMETERS
     self.total_budget = 500  # $500 budget for AI to manage
     self.available_budget = 500  # Current available budget
-    self.max_position_size_percent = 20  # Max 25% of budget per trade for 1hr
+    self.max_position_size_percent = 10  # Max 10% of budget per trade for 1hr
     self.max_concurrent_trades = 4  # Maximum concurrent positions
     
     # AI can trade selected 3 major pairs only
@@ -232,8 +232,8 @@ def setup_futures(self):
     try:
         for pair in self.available_pairs:
             try:
-                # Set initial leverage to 10x (AI can change later)
-                self.binance.futures_change_leverage(symbol=pair, leverage=10)
+                # Set initial leverage to 5x (AI can change later)
+                self.binance.futures_change_leverage(symbol=pair, leverage=5)
                 self.binance.futures_change_margin_type(symbol=pair, marginType='ISOLATED')
                 self.print_color(f"✅ Leverage set for {pair}", self.Fore.GREEN)
             except Exception as e:
@@ -308,14 +308,6 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
         prompt = f"""
         YOU ARE A FULLY AUTONOMOUS AI TRADER with ${self.available_budget:.2f} budget.
 
-        RISK MANAGEMENT GUIDELINES:
-        - Total Budget: ${self.total_budget}
-        - Available Budget: ${self.available_budget:.2f}
-        - Recommended Position Size: 10-25% of available budget (${self.available_budget * 0.1:.2f} - ${self.available_budget * 0.25:.2f})
-        - Maximum Position: ${self.total_budget * self.max_position_size_percent / 100:.2f} (25% of total budget)
-        - Minimum Position: $50 (to avoid micro positions)
-        - Use leverage 10-30x appropriately based on market volatility
-
         {learning_context}
 
         MARKET ANALYSIS FOR {pair} (3MINUTE MONITORING):
@@ -338,7 +330,7 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
             "decision": "LONG" | "SHORT" | "HOLD" | "REVERSE_LONG" | "REVERSE_SHORT",
             "position_size_usd": number,
             "entry_price": number,
-            "leverage": number (10-30),
+            "leverage": number (5-10),
             "confidence": 0-100,
             "reasoning": "analysis including when to manually close based on market conditions"
         }}
@@ -391,15 +383,15 @@ def parse_ai_trading_decision(self, ai_response, pair, current_price, current_tr
             decision = decision_data.get('decision', 'HOLD').upper()
             position_size_usd = float(decision_data.get('position_size_usd', 0))
             entry_price = float(decision_data.get('entry_price', 0))
-            leverage = int(decision_data.get('leverage', 10))
+            leverage = int(decision_data.get('leverage', 5))
             confidence = float(decision_data.get('confidence', 50))
             reasoning = decision_data.get('reasoning', 'AI Analysis')
             
             # Validate leverage
-            if leverage < 10:
+            if leverage < 5:
+                leverage = 5
+            elif leverage > 10:
                 leverage = 10
-            elif leverage > 30:
-                leverage = 30
                 
             if entry_price <= 0:
                 entry_price = current_price
@@ -435,9 +427,9 @@ def get_fallback_decision(self, pair, market_data):
     if decision != "HOLD":
         return {
             "decision": decision,
-            "position_size_usd": 120,
+            "position_size_usd": 25,
             "entry_price": current_price,
-            "leverage": 15,
+            "leverage": 5,
             "confidence": 65,
             "reasoning": f"Fallback: {decision} based on market conditions",
             "should_reverse": False
@@ -447,7 +439,7 @@ def get_fallback_decision(self, pair, market_data):
             "decision": "HOLD",
             "position_size_usd": 0,
             "entry_price": current_price,
-            "leverage": 10,
+            "leverage": 5,
             "confidence": 40,
             "reasoning": "Fallback: Waiting for better opportunity",
             "should_reverse": False
@@ -715,7 +707,7 @@ def get_ai_decision_with_learning(self, pair, market_data):
             "decision": "HOLD",
             "position_size_usd": 0,
             "entry_price": market_data['current_price'],
-            "leverage": 10,
+            "leverage": 5,
             "confidence": 0,
             "reasoning": f"Blocked - matches known error pattern",
             "should_reverse": False
@@ -1079,7 +1071,7 @@ def start_trading(self):
     self.print_color("🔄 REVERSE POSITION: ENABLED (AI can flip losing positions)", self.Fore.MAGENTA + self.Style.BRIGHT)
     self.print_color("🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
     self.print_color("⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
-    self.print_color("⚡ LEVERAGE: 10x to 30x", self.Fore.RED + self.Style.BRIGHT)
+    self.print_color("⚡ LEVERAGE: 5x to 10x", self.Fore.RED + self.Style.BRIGHT)
     if LEARN_SCRIPT_AVAILABLE:
         self.print_color("🧠 SELF-LEARNING AI: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
     
