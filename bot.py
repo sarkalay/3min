@@ -349,7 +349,7 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
         data = {
             "model": "deepseek/deepseek-chat-v3.1",
             "messages": [
-                {"role": "system", "content": "You are a fully autonomous AI trader with reverse position capability. You manually close positions based on market conditions - no TP/SL orders are set. Analyze when to enter AND when to exit based on technical analysis. Monitor every 1 minute."},
+                {"role": "system", "content": "You are a fully autonomous AI trader with reverse position capability. You manually close positions based on market conditions - no TP/SL orders are set. Analyze when to enter AND when to exit based on technical analysis. Monitor every 3 minute."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.3,
@@ -868,7 +868,7 @@ def get_ai_close_decision(self, pair, trade):
         data = {
             "model": "deepseek/deepseek-chat-v3.1",
             "messages": [
-                {"role": "system", "content": "You are an AI trader monitoring active positions every 1 minute. Decide whether to close positions based on current market conditions, technical analysis, and risk management. Provide clear reasoning for your close decisions."},
+                {"role": "system", "content": "You are an AI trader monitoring active positions every 3 minute. Decide whether to close positions based on current market conditions, technical analysis, and risk management. Provide clear reasoning for your close decisions."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.3,
@@ -934,7 +934,7 @@ def display_dashboard(self):
     self.print_color(f"\n🤖 AI TRADING DASHBOARD - {self.get_thailand_time()}", self.Fore.CYAN + self.Style.BRIGHT)
     self.print_color("=" * 90, self.Fore.CYAN)
     self.print_color(f"🎯 MODE: NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
-    self.print_color(f"⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
+    self.print_color(f"⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
     
     # 🧠 Add learning stats
     if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'mistakes_history'):
@@ -1057,7 +1057,7 @@ def start_trading(self):
     self.print_color("💰 AI MANAGING $500 PORTFOLIO", self.Fore.GREEN + self.Style.BRIGHT)
     self.print_color("🔄 REVERSE POSITION: ENABLED (AI can flip losing positions)", self.Fore.MAGENTA + self.Style.BRIGHT)
     self.print_color("🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
-    self.print_color("⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
+    self.print_color("⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
     self.print_color("⚡ LEVERAGE: 10x to 30x", self.Fore.RED + self.Style.BRIGHT)
     if LEARN_SCRIPT_AVAILABLE:
         self.print_color("🧠 SELF-LEARNING AI: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
@@ -1118,7 +1118,7 @@ class FullyAutonomous1HourPaperTrader:
         self.real_bot.print_color(f"💰 Virtual Budget: ${self.paper_balance}", self.Fore.CYAN + self.Style.BRIGHT)
         self.real_bot.print_color(f"🔄 REVERSE POSITION FEATURE: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
         self.real_bot.print_color(f"🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
-        self.real_bot.print_color(f"⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
+        self.real_bot.print_color(f"⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
         
     def load_paper_history(self):
         """Load PAPER trading history"""
@@ -1295,7 +1295,7 @@ class FullyAutonomous1HourPaperTrader:
             data = {
                 "model": "deepseek/deepseek-chat-v3.1",
                 "messages": [
-                    {"role": "system", "content": "You are an AI paper trader monitoring active positions every 1 minute. Decide whether to close paper positions based on current market conditions and technical analysis."},
+                    {"role": "system", "content": "You are an AI paper trader monitoring active positions every 3 minute. Decide whether to close paper positions based on current market conditions and technical analysis."},
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.3,
@@ -1481,7 +1481,7 @@ class FullyAutonomous1HourPaperTrader:
         self.real_bot.print_color(f"\n🤖 PAPER TRADING DASHBOARD - {self.real_bot.get_thailand_time()}", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color("=" * 90, self.Fore.GREEN)
         self.real_bot.print_color(f"🎯 MODE: NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
-        self.real_bot.print_color(f"⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
+        self.real_bot.print_color(f"⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
         
         active_count = 0
         total_unrealized = 0
@@ -1573,7 +1573,7 @@ class FullyAutonomous1HourPaperTrader:
                 self.real_bot.print_color(f"\n🔄 PAPER TRADING CYCLE {self.paper_cycle_count} (3MIN INTERVAL)", self.Fore.GREEN)
                 self.real_bot.print_color("=" * 60, self.Fore.GREEN)
                 self.run_paper_trading_cycle()
-                self.real_bot.print_color(f"⏳ DeepSeek analyzing next paper opportunities in 1 minute...", self.Fore.BLUE)
+                self.real_bot.print_color(f"⏳ DeepSeek analyzing next paper opportunities in 3 minute...", self.Fore.BLUE)
                 time.sleep(self.monitoring_interval)
                 
             except KeyboardInterrupt:
