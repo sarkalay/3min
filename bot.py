@@ -1103,8 +1103,8 @@ class FullyAutonomous1HourPaperTrader:
         # Copy reverse position settings
         self.allow_reverse_positions = True
         
-        # NEW: Monitoring interval (1 minute)
-        self.monitoring_interval = 60  # 1 minute in seconds
+        # NEW: Monitoring interval (3 minute)
+        self.monitoring_interval = 180  # 3 minute in seconds
         
         self.paper_balance = 500  # Virtual $500 budget
         self.available_budget = 500
