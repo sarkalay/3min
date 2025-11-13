@@ -91,12 +91,12 @@ def _initialize_trading(self):
     # 🎯 FULLY AUTONOMOUS AI TRADING PARAMETERS
     self.total_budget = 500  # $500 budget for AI to manage
     self.available_budget = 500  # Current available budget
-    self.max_position_size_percent = 25  # Max 25% of budget per trade for 1hr
+    self.max_position_size_percent = 20  # Max 25% of budget per trade for 1hr
     self.max_concurrent_trades = 4  # Maximum concurrent positions
     
     # AI can trade selected 4 major pairs only
     self.available_pairs = [
-        "BTCUSDT", "BNBUSDT", "SOLUSDT", "AVAXUSDT"
+        "BNBUSDT", "SOLUSDT", "AVAXUSDT"
     ]
     
     # Track AI-opened trades
@@ -307,6 +307,14 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
         # 🧠 COMPREHENSIVE AI TRADING PROMPT WITH REVERSE FEATURE
         prompt = f"""
         YOU ARE A FULLY AUTONOMOUS AI TRADER with ${self.available_budget:.2f} budget.
+
+        RISK MANAGEMENT GUIDELINES:
+        - Total Budget: ${self.total_budget}
+        - Available Budget: ${self.available_budget:.2f}
+        - Recommended Position Size: 10-25% of available budget (${self.available_budget * 0.1:.2f} - ${self.available_budget * 0.25:.2f})
+        - Maximum Position: ${self.total_budget * self.max_position_size_percent / 100:.2f} (25% of total budget)
+        - Minimum Position: $50 (to avoid micro positions)
+        - Use leverage 10-30x appropriately based on market volatility
 
         {learning_context}
 
