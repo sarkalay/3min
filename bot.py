@@ -1600,35 +1600,35 @@ class FullyAutonomous1HourPaperTrader:
                 
 if __name__ == "__main__":
     try:
-        ai_trader = FullyAutonomous1HourAITrader()    print("\n" + "="*80)
-    print(" AI TRADER WITH 1MINUTE MONITORING & ENHANCED REVERSE FEATURE")
-    print("="*80)
-    print("SELECT MODE:")
-    print("1.  Live Trading (Real Money)")
-    print("2.  Paper Trading (Virtual Money)")
-    
-    choice = input("Enter choice (1-2): ").strip()
-    
-    if choice == "1":
-        print("  WARNING: REAL MONEY TRADING! ")
-        print(" REVERSE POSITION FEATURE: ENABLED")
-        print(" NO TP/SL - AI MANUAL CLOSE ONLY")
-        print(" MONITORING: 1 MINUTE INTERVAL")
-        print(" AI CAN FLIP LOSING POSITIONS (WITH CONFIRMATION)")
-        if LEARN_SCRIPT_AVAILABLE:
-            print(" SELF-LEARNING AI: ENABLED")
-        confirm = input("Type '1MINUTE' to confirm: ").strip()
-        if confirm.upper() == '1MINUTE':
-            ai_trader.start_trading()
+        ai_trader = FullyAutonomous1HourAITrader()
+        
+        print("\n" + "="*80)
+        print("🤖 AI TRADER WITH 1MINUTE MONITORING & ENHANCED REVERSE FEATURE")
+        print("="*80)
+        print("SELECT MODE:")
+        print("1. 🚀 Live Trading (Real Money)")
+        print("2. 💸 Paper Trading (Virtual Money)")
+        
+        choice = input("Enter choice (1-2): ").strip()
+        
+        if choice == "1":
+            print("⚠️  WARNING: REAL MONEY TRADING! ⚠️")
+            print("🔄 REVERSE POSITION FEATURE: ENABLED")
+            print("🎯 NO TP/SL - AI MANUAL CLOSE ONLY")
+            print("⏰ MONITORING: 1 MINUTE INTERVAL")
+            print("⚡ AI CAN FLIP LOSING POSITIONS (WITH CONFIRMATION)")
+            if LEARN_SCRIPT_AVAILABLE:
+                print("🧠 SELF-LEARNING AI: ENABLED")
+            confirm = input("Type '1MINUTE' to confirm: ").strip()
+            if confirm.upper() == '1MINUTE':
+                ai_trader.start_trading()
+            else:
+                print("Using Paper Trading mode instead...")
+                paper_bot = FullyAutonomous1HourPaperTrader(ai_trader)
+                paper_bot.start_paper_trading()
         else:
-            print("Using Paper Trading mode instead...")
             paper_bot = FullyAutonomous1HourPaperTrader(ai_trader)
             paper_bot.start_paper_trading()
-    else:
-        paper_bot = FullyAutonomous1HourPaperTrader(ai_trader)
-        paper_bot.start_paper_trading()
-        
-except Exception as e:
-    print(f"Failed to start AI trader: {e}")
-
-
+            
+    except Exception as e:
+        print(f"Failed to start AI trader: {e}")
