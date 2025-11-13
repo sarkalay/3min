@@ -307,6 +307,13 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
         # 🧠 COMPREHENSIVE AI TRADING PROMPT WITH REVERSE FEATURE
         prompt = f"""
         YOU ARE A FULLY AUTONOMOUS AI TRADER with ${self.available_budget:.2f} budget.
+        RISK MANAGEMENT GUIDELINES:
+        - Total Budget: ${self.total_budget}
+        - Available Budget: ${self.available_budget:.2f}
+        - Recommended Position Size: 10-25% of available budget (${self.available_budget * 0.1:.2f} - ${self.available_budget * 0.25:.2f})
+        - Maximum Position: ${self.total_budget * self.max_position_size_percent / 100:.2f} (25% of total budget)
+        - Minimum Position: $25 (to avoid micro positions)
+        - Use leverage 5-10x appropriately based on market volatility
 
         {learning_context}
 
