@@ -1597,7 +1597,8 @@ class FullyAutonomous1HourPaperTrader:
             except Exception as e:
                 self.real_bot.print_color(f"PAPER: Trading error: {e}", self.Fore.RED)
                 time.sleep(self.monitoring_interval)
-                if __name__ == "__main__":
+                
+if __name__ == "__main__":
     try:
         ai_trader = FullyAutonomous1HourAITrader()    print("\n" + "="*80)
     print(" AI TRADER WITH 1MINUTE MONITORING & ENHANCED REVERSE FEATURE")
