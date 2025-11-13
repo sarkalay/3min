@@ -179,6 +179,7 @@ def add_trade_to_history(self, trade_data):
         # 🧠 Learn from this trade (especially if it's a loss)
         if LEARN_SCRIPT_AVAILABLE:
             self.learn_from_mistake(trade_data)
+            self.adaptive_learning_adjustment()  # ← ထည့်ပါ
         
         # Update performance stats
         self.performance_stats['total_trades'] += 1
@@ -822,21 +823,6 @@ def execute_ai_trade(self, pair, ai_decision):
         self.print_color(f"❌ Trade execution failed: {e}", self.Fore.RED)
         return False
 
-# Add all methods to the class
-methods = [
-    load_real_trade_history, save_real_trade_history, add_trade_to_history,
-    get_thailand_time, print_color, validate_config, setup_futures,
-    load_symbol_precision, get_market_news_sentiment, get_ai_trading_decision,
-    parse_ai_trading_decision, get_fallback_decision, calculate_current_pnl,
-    execute_reverse_position, close_trade_immediately, get_price_history,
-    get_current_price, calculate_quantity, can_open_new_position,
-    get_ai_decision_with_learning, execute_ai_trade
-]
-
-for method in methods:
-    setattr(FullyAutonomous1HourAITrader, method.__name__, method)
-
-# Add the remaining methods
 def get_ai_close_decision(self, pair, trade):
     """Ask AI whether to close this position based on market conditions"""
     try:
@@ -1044,6 +1030,10 @@ def run_trading_cycle(self):
             self.show_trade_history(8)
             self.show_trading_stats()
         
+        # 🧠 Show advanced learning progress every 10 cycles
+        if self.cycle_count % 10 == 0 and LEARN_SCRIPT_AVAILABLE:
+            self.show_advanced_learning_progress()
+        
         self.print_color(f"\n🔍 DEEPSEEK SCANNING {len(self.available_pairs)} PAIRS...", self.Fore.BLUE + self.Style.BRIGHT)
         
         qualified_signals = 0
@@ -1104,16 +1094,23 @@ def start_trading(self):
             self.print_color(f"Main loop error: {e}", self.Fore.RED)
             time.sleep(self.monitoring_interval)
 
-# Add remaining methods
-remaining_methods = [
-    get_ai_close_decision, monitor_positions, display_dashboard,
-    show_trade_history, show_trading_stats, run_trading_cycle, start_trading
+# Add all methods to the class
+methods = [
+    load_real_trade_history, save_real_trade_history, add_trade_to_history,
+    get_thailand_time, print_color, validate_config, setup_futures,
+    load_symbol_precision, get_market_news_sentiment, get_ai_trading_decision,
+    parse_ai_trading_decision, get_fallback_decision, calculate_current_pnl,
+    execute_reverse_position, close_trade_immediately, get_price_history,
+    get_current_price, calculate_quantity, can_open_new_position,
+    get_ai_decision_with_learning, execute_ai_trade, get_ai_close_decision,
+    monitor_positions, display_dashboard, show_trade_history, show_trading_stats,
+    run_trading_cycle, start_trading
 ]
 
-for method in remaining_methods:
+for method in methods:
     setattr(FullyAutonomous1HourAITrader, method.__name__, method)
 
-# Paper trading class (simplified for brevity)
+# Paper trading class
 class FullyAutonomous1HourPaperTrader:
     def __init__(self, real_bot):
         self.real_bot = real_bot
@@ -1425,7 +1422,7 @@ class FullyAutonomous1HourPaperTrader:
             self.real_bot.print_color(f"❌ PAPER: Trade execution failed: {e}", self.Fore.RED)
             return False
 
-        def monitor_paper_positions(self):
+    def monitor_paper_positions(self):
         """Monitor paper positions and ask AI when to close"""
         try:
             closed_positions = []
