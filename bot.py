@@ -1,4 +1,19 @@
+import sys
 import os
+
+# Add current directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
+# Try to import learn script
+try:
+    from learn_script import SelfLearningAITrader
+    LEARN_SCRIPT_AVAILABLE = True
+    print("✅ Learn script loaded successfully!")
+except ImportError as e:
+    print(f"❌ Learn script import failed: {e}")
+    LEARN_SCRIPT_AVAILABLE = False
+
 import requests
 import json
 import time
@@ -33,8 +48,28 @@ if not COLORAMA_AVAILABLE:
     Back = DummyColors() 
     Style = DummyColors()
 
-class FullyAutonomous1HourAITrader:
+# Use conditional inheritance
+if LEARN_SCRIPT_AVAILABLE:
+    class FullyAutonomous1HourAITrader(SelfLearningAITrader):
+else:
+    class FullyAutonomous1HourAITrader(object):
+
     def __init__(self):
+        # Initialize learning component if available
+        if LEARN_SCRIPT_AVAILABLE:
+            super().__init__()
+        else:
+            # Fallback initialization without learning
+            self.mistakes_history = []
+            self.learned_patterns = {}
+            self.performance_stats = {
+                'total_trades': 0,
+                'winning_trades': 0,
+                'losing_trades': 0,
+                'common_mistakes': {},
+                'improvement_areas': []
+            }
+        
         # Load config from .env file
         self.binance_api_key = os.getenv('BINANCE_API_KEY')
         self.binance_secret = os.getenv('BINANCE_SECRET_KEY')
@@ -79,14 +114,20 @@ class FullyAutonomous1HourAITrader:
         # NEW: Reverse position settings
         self.allow_reverse_positions = True  # Enable reverse position feature
         
+        # NEW: Monitoring interval (1 minute)
+        self.monitoring_interval = 60  # 1 minute in seconds
+        
         # Initialize Binance client
         try:
             self.binance = Client(self.binance_api_key, self.binance_secret)
-            self.print_color(f"🤖 FULLY AUTONOMOUS 1HOUR AI TRADER ACTIVATED! 🤖", self.Fore.CYAN + self.Style.BRIGHT)
+            self.print_color(f"🤖 FULLY AUTONOMOUS AI TRADER ACTIVATED! 🤖", self.Fore.CYAN + self.Style.BRIGHT)
             self.print_color(f"💰 TOTAL BUDGET: ${self.total_budget}", self.Fore.GREEN + self.Style.BRIGHT)
             self.print_color(f"🔄 REVERSE POSITION FEATURE: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
             self.print_color(f"🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
-            self.print_color(f"⏰ Timeframe: 1HOUR | Max Positions: {self.max_concurrent_trades}", self.Fore.YELLOW + self.Style.BRIGHT)
+            self.print_color(f"⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
+            self.print_color(f"📊 Max Positions: {self.max_concurrent_trades}", self.Fore.YELLOW + self.Style.BRIGHT)
+            if LEARN_SCRIPT_AVAILABLE:
+                self.print_color(f"🧠 SELF-LEARNING AI: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
         except Exception as e:
             self.print_color(f"Binance initialization failed: {e}", self.Fore.RED)
             self.binance = None
@@ -120,19 +161,26 @@ class FullyAutonomous1HourAITrader:
             self.print_color(f"Error saving trade history: {e}", self.Fore.RED)
 
     def add_trade_to_history(self, trade_data):
-        """Add trade to history"""
+        """Add trade to history WITH learning"""
         try:
             trade_data['close_time'] = self.get_thailand_time()
             trade_data['close_timestamp'] = time.time()
             trade_data['trade_type'] = 'REAL'
             self.real_trade_history.append(trade_data)
             
-            # Update statistics
-            self.real_total_trades += 1
+            # 🧠 Learn from this trade (especially if it's a loss)
+            if LEARN_SCRIPT_AVAILABLE:
+                self.learn_from_mistake(trade_data)
+            
+            # Update performance stats
+            self.performance_stats['total_trades'] += 1
             pnl = trade_data.get('pnl', 0)
             self.real_total_pnl += pnl
             if pnl > 0:
                 self.real_winning_trades += 1
+                self.performance_stats['winning_trades'] += 1
+            else:
+                self.performance_stats['losing_trades'] += 1
                 
             if len(self.real_trade_history) > 200:
                 self.real_trade_history = self.real_trade_history[-200:]
@@ -242,11 +290,18 @@ class FullyAutonomous1HourAITrader:
                 - Should we REVERSE this position?
                 """
             
+            # 🧠 Add learning context to prompt
+            learning_context = ""
+            if LEARN_SCRIPT_AVAILABLE:
+                learning_context = self.get_learning_enhanced_prompt(pair, market_data)
+            
             # 🧠 COMPREHENSIVE AI TRADING PROMPT WITH REVERSE FEATURE
             prompt = f"""
             YOU ARE A FULLY AUTONOMOUS AI TRADER with ${self.available_budget:.2f} budget.
 
-            MARKET ANALYSIS FOR {pair} (1HOUR TIMEFRAME):
+            {learning_context}
+
+            MARKET ANALYSIS FOR {pair} (1MINUTE MONITORING):
             - Current Price: ${current_price:.6f}
             - 1Hour Price Change: {market_data.get('price_change', 0):.2f}%
             - Support/Resistance Levels: {market_data.get('support_levels', [])} / {market_data.get('resistance_levels', [])}
@@ -280,20 +335,20 @@ class FullyAutonomous1HourAITrader:
                 "Authorization": f"Bearer {self.openrouter_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://github.com",
-                "X-Title": "Fully Autonomous 1Hour AI Trader"
+                "X-Title": "Fully Autonomous AI Trader"
             }
             
             data = {
                 "model": "deepseek/deepseek-chat-v3.1",
                 "messages": [
-                    {"role": "system", "content": "You are a fully autonomous AI trader with reverse position capability. You manually close positions based on market conditions - no TP/SL orders are set. Analyze when to enter AND when to exit based on technical analysis."},
+                    {"role": "system", "content": "You are a fully autonomous AI trader with reverse position capability. You manually close positions based on market conditions - no TP/SL orders are set. Analyze when to enter AND when to exit based on technical analysis. Monitor every 1 minute."},
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.3,
                 "max_tokens": 800
             }
             
-            self.print_color(f"🧠 DeepSeek Analyzing {pair} with REVERSE feature...", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.print_color(f"🧠 DeepSeek Analyzing {pair} with 1MIN monitoring...", self.Fore.MAGENTA + self.Style.BRIGHT)
             response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=60)
             
             if response.status_code == 200:
@@ -370,7 +425,7 @@ class FullyAutonomous1HourAITrader:
             return 0
 
     def execute_reverse_position(self, pair, ai_decision, current_trade):
-        """Execute reverse position - close current and open opposite"""
+        """Execute reverse position - CLOSE CURRENT, THEN ASK AI BEFORE OPENING REVERSE"""
         try:
             self.print_color(f"🔄 ATTEMPTING REVERSE POSITION FOR {pair}", self.Fore.YELLOW + self.Style.BRIGHT)
             
@@ -386,16 +441,34 @@ class FullyAutonomous1HourAITrader:
                     self.print_color(f"⚠️  Position still exists after close, forcing removal...", self.Fore.RED)
                     del self.ai_opened_trades[pair]
                 
-                # 4. Open reverse position
-                new_direction = "SHORT" if current_trade['direction'] == "LONG" else "LONG"
-                self.print_color(f"🎯 OPENING REVERSE POSITION: {new_direction} {pair}", self.Fore.CYAN + self.Style.BRIGHT)
+                # 4. 🆕 ASK AI AGAIN BEFORE OPENING REVERSE POSITION
+                self.print_color(f"🔍 Asking AI to confirm reverse position for {pair}...", self.Fore.BLUE)
+                market_data = self.get_price_history(pair)
                 
-                # Use AI's decision but adjust for reverse
-                reverse_decision = ai_decision.copy()
-                reverse_decision["decision"] = new_direction
+                # Get fresh AI decision after closing
+                new_ai_decision = self.get_ai_trading_decision(pair, market_data, None)
                 
-                # Execute the reverse trade
-                return self.execute_ai_trade(pair, reverse_decision)
+                # Check if AI still wants to open reverse position
+                if new_ai_decision["decision"] in ["LONG", "SHORT"] and new_ai_decision["position_size_usd"] > 0:
+                    # 🎯 Calculate correct reverse direction
+                    current_direction = current_trade['direction']
+                    if current_direction == "LONG":
+                        correct_reverse_direction = "SHORT"
+                    else:
+                        correct_reverse_direction = "LONG"
+                    
+                    self.print_color(f"✅ AI CONFIRMED: Opening {correct_reverse_direction} {pair}", self.Fore.CYAN + self.Style.BRIGHT)
+                    
+                    # Use the new AI decision but ensure correct direction
+                    reverse_decision = new_ai_decision.copy()
+                    reverse_decision["decision"] = correct_reverse_direction
+                    
+                    # Execute the reverse trade
+                    return self.execute_ai_trade(pair, reverse_decision)
+                else:
+                    self.print_color(f"🔄 AI changed mind, not opening reverse position for {pair}", self.Fore.YELLOW)
+                    self.print_color(f"📝 AI Decision: {new_ai_decision['decision']} | Reason: {new_ai_decision['reasoning']}", self.Fore.WHITE)
+                    return False
             else:
                 self.print_color(f"❌ Reverse position failed: Could not close current trade", self.Fore.RED)
                 return False
@@ -447,7 +520,7 @@ class FullyAutonomous1HourAITrader:
                 self.add_trade_to_history(trade.copy())
                 self.print_color(f"✅ Position closed for reverse: {pair} | P&L: ${pnl:.2f}", self.Fore.CYAN)
                 
-                # 🔴 BUG FIX: Remove from active positions after closing
+                # Remove from active positions after closing
                 if pair in self.ai_opened_trades:
                     del self.ai_opened_trades[pair]
                 
@@ -469,7 +542,7 @@ class FullyAutonomous1HourAITrader:
                 self.available_budget += trade['position_size_usd'] + pnl
                 self.add_trade_to_history(trade.copy())
                 
-                # 🔴 BUG FIX: Remove from active positions after closing
+                # Remove from active positions after closing
                 if pair in self.ai_opened_trades:
                     del self.ai_opened_trades[pair]
                 
@@ -590,6 +663,31 @@ class FullyAutonomous1HourAITrader:
             
         return True, "OK"
 
+    def get_ai_decision_with_learning(self, pair, market_data):
+        """Get AI decision enhanced with learned lessons"""
+        # First get normal AI decision
+        ai_decision = self.get_ai_trading_decision(pair, market_data)
+        
+        # Check if this matches known mistake patterns
+        if LEARN_SCRIPT_AVAILABLE and self.should_avoid_trade(ai_decision, market_data):
+            self.print_color(f"🧠 AI USING LEARNING: Blocking potential mistake for {pair}", self.Fore.YELLOW)
+            return {
+                "decision": "HOLD",
+                "position_size_usd": 0,
+                "entry_price": market_data['current_price'],
+                "leverage": 10,
+                "confidence": 0,
+                "reasoning": f"Blocked - matches known error pattern. Learning from {len(self.mistakes_history)} past mistakes",
+                "should_reverse": False
+            }
+        
+        # Add learning context to reasoning
+        if ai_decision["decision"] != "HOLD" and LEARN_SCRIPT_AVAILABLE:
+            learning_context = f" | Applying lessons from {len(self.mistakes_history)} past mistakes"
+            ai_decision["reasoning"] += learning_context
+        
+        return ai_decision
+
     def execute_ai_trade(self, pair, ai_decision):
         """Execute trade WITHOUT TP/SL orders - AI will close manually"""
         try:
@@ -701,7 +799,7 @@ class FullyAutonomous1HourAITrader:
             current_pnl = self.calculate_current_pnl(trade, current_price)
             
             prompt = f"""
-            SHOULD WE CLOSE THIS POSITION?
+            SHOULD WE CLOSE THIS POSITION? (1MINUTE MONITORING)
             
             CURRENT ACTIVE TRADE:
             - Pair: {pair}
@@ -711,7 +809,7 @@ class FullyAutonomous1HourAITrader:
             - PnL: {current_pnl:.2f}%
             - Position Size: ${trade['position_size_usd']:.2f}
             - Leverage: {trade['leverage']}x
-            - Trade Age: {(time.time() - trade['entry_time']) / 3600:.1f} hours
+            - Trade Age: {(time.time() - trade['entry_time']) / 60:.1f} minutes
             
             MARKET CONDITIONS:
             - 1H Change: {market_data.get('price_change', 0):.2f}%
@@ -741,13 +839,13 @@ class FullyAutonomous1HourAITrader:
                 "Authorization": f"Bearer {self.openrouter_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://github.com",
-                "X-Title": "Fully Autonomous 1Hour AI Trader"
+                "X-Title": "Fully Autonomous AI Trader"
             }
             
             data = {
                 "model": "deepseek/deepseek-chat-v3.1",
                 "messages": [
-                    {"role": "system", "content": "You are an AI trader monitoring active positions. Decide whether to close positions based on current market conditions, technical analysis, and risk management. Provide clear reasoning for your close decisions."},
+                    {"role": "system", "content": "You are an AI trader monitoring active positions every 1 minute. Decide whether to close positions based on current market conditions, technical analysis, and risk management. Provide clear reasoning for your close decisions."},
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.3,
@@ -807,10 +905,17 @@ class FullyAutonomous1HourAITrader:
         return []
 
     def display_dashboard(self):
-        """Display trading dashboard"""
+        """Display trading dashboard WITH learning progress"""
         self.print_color(f"\n🤖 AI TRADING DASHBOARD - {self.get_thailand_time()}", self.Fore.CYAN + self.Style.BRIGHT)
         self.print_color("=" * 90, self.Fore.CYAN)
         self.print_color(f"🎯 MODE: NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
+        self.print_color(f"⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
+        
+        # 🧠 Add learning stats
+        if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'mistakes_history'):
+            total_lessons = len(self.mistakes_history)
+            if total_lessons > 0:
+                self.print_color(f"🧠 AI HAS LEARNED FROM {total_lessons} MISTAKES", self.Fore.MAGENTA + self.Style.BRIGHT)
         
         active_count = 0
         total_unrealized = 0
@@ -834,7 +939,7 @@ class FullyAutonomous1HourAITrader:
                 self.print_color(f"   Size: ${trade['position_size_usd']:.2f} | Leverage: {trade['leverage']}x ⚡", self.Fore.WHITE)
                 self.print_color(f"   Entry: ${trade['entry_price']:.4f} | Current: ${current_price:.4f}", self.Fore.WHITE)
                 self.print_color(f"   P&L: ${unrealized_pnl:.2f}", pnl_color)
-                self.print_color(f"   🎯 NO TP/SL - AI Monitoring", self.Fore.YELLOW)
+                self.print_color(f"   🎯 NO TP/SL - AI Monitoring Every 1min", self.Fore.YELLOW)
                 self.print_color("   " + "-" * 60, self.Fore.CYAN)
         
         if active_count == 0:
@@ -887,7 +992,7 @@ class FullyAutonomous1HourAITrader:
             self.display_dashboard()
             
             # Show stats periodically
-            if hasattr(self, 'cycle_count') and self.cycle_count % 2 == 0:
+            if hasattr(self, 'cycle_count') and self.cycle_count % 5 == 0:  # Every 5 cycles (5 minutes)
                 self.show_trade_history(8)
                 self.show_trading_stats()
             
@@ -898,9 +1003,8 @@ class FullyAutonomous1HourAITrader:
                 if self.available_budget > 100:
                     market_data = self.get_price_history(pair)
                     
-                    # Pass current trade to AI for reverse analysis
-                    current_trade = self.ai_opened_trades.get(pair)
-                    ai_decision = self.get_ai_trading_decision(pair, market_data, current_trade)
+                    # Use learning-enhanced AI decision
+                    ai_decision = self.get_ai_decision_with_learning(pair, market_data)
                     
                     if ai_decision["decision"] != "HOLD" and ai_decision["position_size_usd"] > 0:
                         qualified_signals += 1
@@ -914,7 +1018,7 @@ class FullyAutonomous1HourAITrader:
                         
                         success = self.execute_ai_trade(pair, ai_decision)
                         if success:
-                            time.sleep(3)
+                            time.sleep(2)  # Reduced delay for faster 1min cycles
                 
             if qualified_signals == 0:
                 self.print_color("No qualified DeepSeek signals this cycle", self.Fore.YELLOW)
@@ -924,21 +1028,24 @@ class FullyAutonomous1HourAITrader:
 
     def start_trading(self):
         """Start trading with REVERSE position feature and NO TP/SL"""
-        self.print_color("🚀 STARTING AI TRADER WITH REVERSE POSITION FEATURE!", self.Fore.CYAN + self.Style.BRIGHT)
+        self.print_color("🚀 STARTING AI TRADER WITH 1MINUTE MONITORING!", self.Fore.CYAN + self.Style.BRIGHT)
         self.print_color("💰 AI MANAGING $500 PORTFOLIO", self.Fore.GREEN + self.Style.BRIGHT)
         self.print_color("🔄 REVERSE POSITION: ENABLED (AI can flip losing positions)", self.Fore.MAGENTA + self.Style.BRIGHT)
         self.print_color("🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
+        self.print_color("⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
         self.print_color("⚡ LEVERAGE: 10x to 30x", self.Fore.RED + self.Style.BRIGHT)
+        if LEARN_SCRIPT_AVAILABLE:
+            self.print_color("🧠 SELF-LEARNING AI: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
         
         self.cycle_count = 0
         while True:
             try:
                 self.cycle_count += 1
-                self.print_color(f"\n🔄 TRADING CYCLE {self.cycle_count}", self.Fore.CYAN + self.Style.BRIGHT)
+                self.print_color(f"\n🔄 TRADING CYCLE {self.cycle_count} (1MIN INTERVAL)", self.Fore.CYAN + self.Style.BRIGHT)
                 self.print_color("=" * 60, self.Fore.CYAN)
                 self.run_trading_cycle()
-                self.print_color(f"⏳ Next analysis in 5 minutes...", self.Fore.BLUE)
-                time.sleep(300)
+                self.print_color(f"⏳ Next analysis in 1 minute...", self.Fore.BLUE)
+                time.sleep(self.monitoring_interval)  # 1 minute
                 
             except KeyboardInterrupt:
                 self.print_color(f"\n🛑 TRADING STOPPED", self.Fore.RED + self.Style.BRIGHT)
@@ -947,7 +1054,7 @@ class FullyAutonomous1HourAITrader:
                 break
             except Exception as e:
                 self.print_color(f"Main loop error: {e}", self.Fore.RED)
-                time.sleep(300)
+                time.sleep(self.monitoring_interval)
 
 
 class FullyAutonomous1HourPaperTrader:
@@ -962,17 +1069,20 @@ class FullyAutonomous1HourPaperTrader:
         # Copy reverse position settings
         self.allow_reverse_positions = True
         
+        # NEW: Monitoring interval (1 minute)
+        self.monitoring_interval = 60  # 1 minute in seconds
+        
         self.paper_balance = 500  # Virtual $500 budget
         self.available_budget = 500
         self.paper_positions = {}
         self.paper_history_file = "fully_autonomous_1hour_paper_trading_history.json"
         self.paper_history = self.load_paper_history()
         
-        self.real_bot.print_color("🤖 FULLY AUTONOMOUS 1HOUR PAPER TRADER INITIALIZED!", self.Fore.GREEN + self.Style.BRIGHT)
+        self.real_bot.print_color("🤖 FULLY AUTONOMOUS PAPER TRADER INITIALIZED!", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color(f"💰 Virtual Budget: ${self.paper_balance}", self.Fore.CYAN + self.Style.BRIGHT)
         self.real_bot.print_color(f"🔄 REVERSE POSITION FEATURE: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
         self.real_bot.print_color(f"🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
-        self.real_bot.print_color(f"⏰ 1HOUR Timeframe | Leverage: 10x to 30x ⚡", self.Fore.YELLOW + self.Style.BRIGHT)
+        self.real_bot.print_color(f"⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
         
     def load_paper_history(self):
         """Load PAPER trading history"""
@@ -1020,7 +1130,7 @@ class FullyAutonomous1HourPaperTrader:
             return 0
 
     def paper_execute_reverse_position(self, pair, ai_decision, current_trade):
-        """Execute reverse position in paper trading"""
+        """Execute reverse position in paper trading - CLOSE CURRENT, THEN ASK AI BEFORE OPENING REVERSE"""
         try:
             self.real_bot.print_color(f"🔄 PAPER: ATTEMPTING REVERSE POSITION FOR {pair}", self.Fore.YELLOW + self.Style.BRIGHT)
             
@@ -1031,21 +1141,39 @@ class FullyAutonomous1HourPaperTrader:
                 # 2. Wait a moment and verify position is actually closed
                 time.sleep(1)
                 
-                # 🔴 BUG FIX: Verify position is actually removed
+                # Verify position is actually removed
                 if pair in self.paper_positions:
                     self.real_bot.print_color(f"⚠️  PAPER: Position still exists after close, forcing removal...", self.Fore.RED)
                     del self.paper_positions[pair]
                 
-                # 3. Open reverse position
-                new_direction = "SHORT" if current_trade['direction'] == "LONG" else "LONG"
-                self.real_bot.print_color(f"🎯 PAPER: OPENING REVERSE POSITION: {new_direction} {pair}", self.Fore.CYAN + self.Style.BRIGHT)
+                # 3. 🆕 ASK AI AGAIN BEFORE OPENING REVERSE POSITION
+                self.real_bot.print_color(f"🔍 PAPER: Asking AI to confirm reverse position for {pair}...", self.Fore.BLUE)
+                market_data = self.real_bot.get_price_history(pair)
                 
-                # Use AI's decision but adjust for reverse
-                reverse_decision = ai_decision.copy()
-                reverse_decision["decision"] = new_direction
+                # Get fresh AI decision after closing
+                new_ai_decision = self.real_bot.get_ai_trading_decision(pair, market_data, None)
                 
-                # Execute the reverse trade
-                return self.paper_execute_trade(pair, reverse_decision)
+                # Check if AI still wants to open reverse position
+                if new_ai_decision["decision"] in ["LONG", "SHORT"] and new_ai_decision["position_size_usd"] > 0:
+                    # 🎯 Calculate correct reverse direction
+                    current_direction = current_trade['direction']
+                    if current_direction == "LONG":
+                        correct_reverse_direction = "SHORT"
+                    else:
+                        correct_reverse_direction = "LONG"
+                    
+                    self.real_bot.print_color(f"✅ PAPER AI CONFIRMED: Opening {correct_reverse_direction} {pair}", self.Fore.CYAN + self.Style.BRIGHT)
+                    
+                    # Use the new AI decision but ensure correct direction
+                    reverse_decision = new_ai_decision.copy()
+                    reverse_decision["decision"] = correct_reverse_direction
+                    
+                    # Execute the reverse trade
+                    return self.paper_execute_trade(pair, reverse_decision)
+                else:
+                    self.real_bot.print_color(f"🔄 PAPER AI changed mind, not opening reverse position for {pair}", self.Fore.YELLOW)
+                    self.real_bot.print_color(f"📝 PAPER AI Decision: {new_ai_decision['decision']} | Reason: {new_ai_decision['reasoning']}", self.Fore.WHITE)
+                    return False
             else:
                 self.real_bot.print_color(f"❌ PAPER: Reverse position failed", self.Fore.RED)
                 return False
@@ -1075,7 +1203,7 @@ class FullyAutonomous1HourPaperTrader:
             self.add_paper_trade_to_history(trade.copy())
             self.real_bot.print_color(f"✅ PAPER: Position closed for reverse: {pair} | P&L: ${pnl:.2f}", self.Fore.CYAN)
             
-            # 🔴 BUG FIX: Remove from active positions after closing
+            # Remove from active positions after closing
             if pair in self.paper_positions:
                 del self.paper_positions[pair]
             
@@ -1093,7 +1221,7 @@ class FullyAutonomous1HourPaperTrader:
             current_pnl = self.calculate_current_pnl(trade, current_price)
             
             prompt = f"""
-            SHOULD WE CLOSE THIS PAPER TRADING POSITION?
+            SHOULD WE CLOSE THIS PAPER TRADING POSITION? (1MINUTE MONITORING)
             
             CURRENT ACTIVE PAPER TRADE:
             - Pair: {pair}
@@ -1103,7 +1231,7 @@ class FullyAutonomous1HourPaperTrader:
             - PnL: {current_pnl:.2f}%
             - Position Size: ${trade['position_size_usd']:.2f}
             - Leverage: {trade['leverage']}x
-            - Trade Age: {(time.time() - trade['entry_time']) / 3600:.1f} hours
+            - Trade Age: {(time.time() - trade['entry_time']) / 60:.1f} minutes
             
             MARKET CONDITIONS:
             - 1H Change: {market_data.get('price_change', 0):.2f}%
@@ -1125,13 +1253,13 @@ class FullyAutonomous1HourPaperTrader:
                 "Authorization": f"Bearer {self.real_bot.openrouter_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://github.com",
-                "X-Title": "Fully Autonomous 1Hour AI Paper Trader"
+                "X-Title": "Fully Autonomous AI Paper Trader"
             }
             
             data = {
                 "model": "deepseek/deepseek-chat-v3.1",
                 "messages": [
-                    {"role": "system", "content": "You are an AI paper trader monitoring active positions. Decide whether to close paper positions based on current market conditions and technical analysis."},
+                    {"role": "system", "content": "You are an AI paper trader monitoring active positions every 1 minute. Decide whether to close paper positions based on current market conditions and technical analysis."},
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.3,
@@ -1317,6 +1445,7 @@ class FullyAutonomous1HourPaperTrader:
         self.real_bot.print_color(f"\n🤖 PAPER TRADING DASHBOARD - {self.real_bot.get_thailand_time()}", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color("=" * 90, self.Fore.GREEN)
         self.real_bot.print_color(f"🎯 MODE: NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
+        self.real_bot.print_color(f"⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
         
         active_count = 0
         total_unrealized = 0
@@ -1340,7 +1469,7 @@ class FullyAutonomous1HourPaperTrader:
                 self.real_bot.print_color(f"   Size: ${trade['position_size_usd']:.2f} | Leverage: {trade['leverage']}x ⚡", self.Fore.WHITE)
                 self.real_bot.print_color(f"   Entry: ${trade['entry_price']:.4f} | Current: ${current_price:.4f}", self.Fore.WHITE)
                 self.real_bot.print_color(f"   P&L: ${unrealized_pnl:.2f}", pnl_color)
-                self.real_bot.print_color(f"   🎯 NO TP/SL - AI Monitoring", self.Fore.YELLOW)
+                self.real_bot.print_color(f"   🎯 NO TP/SL - AI Monitoring Every 1min", self.Fore.YELLOW)
                 self.real_bot.print_color("   " + "-" * 60, self.Fore.GREEN)
         
         if active_count == 0:
@@ -1355,8 +1484,8 @@ class FullyAutonomous1HourPaperTrader:
             self.monitor_paper_positions()
             self.display_paper_dashboard()
             
-            # Show paper history every 5 cycles
-            if hasattr(self, 'paper_cycle_count') and self.paper_cycle_count % 5 == 0:
+            # Show paper history every 10 cycles (10 minutes)
+            if hasattr(self, 'paper_cycle_count') and self.paper_cycle_count % 10 == 0:
                 self.show_paper_trade_history(8)
             
             self.get_paper_portfolio_status()
@@ -1383,7 +1512,7 @@ class FullyAutonomous1HourPaperTrader:
                             self.real_bot.print_color(f"🎯 PAPER TRADE SIGNAL: {pair} {direction} | Size: ${ai_decision['position_size_usd']:.2f} | {leverage_info}", self.Fore.GREEN + self.Style.BRIGHT)
                         
                         self.paper_execute_trade(pair, ai_decision)
-                        time.sleep(2)
+                        time.sleep(1)  # Reduced delay for faster 1min cycles
                 
             if qualified_signals > 0:
                 self.real_bot.print_color(f"🎯 {qualified_signals} qualified paper signals executed", self.Fore.GREEN + self.Style.BRIGHT)
@@ -1395,21 +1524,21 @@ class FullyAutonomous1HourPaperTrader:
 
     def start_paper_trading(self):
         """Start paper trading with REVERSE feature and NO TP/SL"""
-        self.real_bot.print_color("🚀 STARTING PAPER TRADING WITH REVERSE POSITION FEATURE!", self.Fore.GREEN + self.Style.BRIGHT)
+        self.real_bot.print_color("🚀 STARTING PAPER TRADING WITH 1MINUTE MONITORING!", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color("💰 VIRTUAL $500 BUDGET - NO REAL MONEY", self.Fore.CYAN + self.Style.BRIGHT)
         self.real_bot.print_color("🔄 REVERSE POSITION: ENABLED (AI can flip losing positions)", self.Fore.MAGENTA + self.Style.BRIGHT)
         self.real_bot.print_color("🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
-        self.real_bot.print_color("⏰ 1HOUR Timeframe | Leverage: 10x to 30x ⚡", self.Fore.YELLOW + self.Style.BRIGHT)
+        self.real_bot.print_color("⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
         
         self.paper_cycle_count = 0
         while True:
             try:
                 self.paper_cycle_count += 1
-                self.real_bot.print_color(f"\n🔄 PAPER TRADING CYCLE {self.paper_cycle_count}", self.Fore.GREEN)
+                self.real_bot.print_color(f"\n🔄 PAPER TRADING CYCLE {self.paper_cycle_count} (1MIN INTERVAL)", self.Fore.GREEN)
                 self.real_bot.print_color("=" * 60, self.Fore.GREEN)
                 self.run_paper_trading_cycle()
-                self.real_bot.print_color(f"⏳ DeepSeek analyzing next paper opportunities in 5 minutes...", self.Fore.BLUE)
-                time.sleep(300)
+                self.real_bot.print_color(f"⏳ DeepSeek analyzing next paper opportunities in 1 minute...", self.Fore.BLUE)
+                time.sleep(self.monitoring_interval)
                 
             except KeyboardInterrupt:
                 self.real_bot.print_color(f"\n🛑 PAPER TRADING STOPPED", self.Fore.RED + self.Style.BRIGHT)
@@ -1431,7 +1560,7 @@ class FullyAutonomous1HourPaperTrader:
                 break
             except Exception as e:
                 self.real_bot.print_color(f"PAPER: Trading error: {e}", self.Fore.RED)
-                time.sleep(300)
+                time.sleep(self.monitoring_interval)
 
 
 if __name__ == "__main__":
@@ -1439,7 +1568,7 @@ if __name__ == "__main__":
         ai_trader = FullyAutonomous1HourAITrader()
         
         print("\n" + "="*80)
-        print("🤖 AI TRADER WITH REVERSE POSITION FEATURE & NO TP/SL")
+        print("🤖 AI TRADER WITH 1MINUTE MONITORING & ENHANCED REVERSE FEATURE")
         print("="*80)
         print("SELECT MODE:")
         print("1. 🚀 Live Trading (Real Money)")
@@ -1451,9 +1580,12 @@ if __name__ == "__main__":
             print("⚠️  WARNING: REAL MONEY TRADING! ⚠️")
             print("🔄 REVERSE POSITION FEATURE: ENABLED")
             print("🎯 NO TP/SL - AI MANUAL CLOSE ONLY")
-            print("⚡ AI CAN FLIP LOSING POSITIONS IMMEDIATELY")
-            confirm = input("Type 'MANUALCLOSE' to confirm: ").strip()
-            if confirm.upper() == 'MANUALCLOSE':
+            print("⏰ MONITORING: 1 MINUTE INTERVAL")
+            print("⚡ AI CAN FLIP LOSING POSITIONS (WITH CONFIRMATION)")
+            if LEARN_SCRIPT_AVAILABLE:
+                print("🧠 SELF-LEARNING AI: ENABLED")
+            confirm = input("Type '1MINUTE' to confirm: ").strip()
+            if confirm.upper() == '1MINUTE':
                 ai_trader.start_trading()
             else:
                 print("Using Paper Trading mode instead...")
