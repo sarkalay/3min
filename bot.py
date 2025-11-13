@@ -50,15 +50,13 @@ if not COLORAMA_AVAILABLE:
 
 # Use conditional inheritance
 if LEARN_SCRIPT_AVAILABLE:
-class FullyAutonomous1HourAITrader(SelfLearningAITrader):
+    class FullyAutonomous1HourAITrader(SelfLearningAITrader):
+        def __init__(self):
+            super().__init__()
+            self._initialize_trading()
 else:
     class FullyAutonomous1HourAITrader(object):
-
-    def __init__(self):
-        # Initialize learning component if available
-        if LEARN_SCRIPT_AVAILABLE:
-            super().__init__()
-        else:
+        def __init__(self):
             # Fallback initialization without learning
             self.mistakes_history = []
             self.learned_patterns = {}
@@ -69,7 +67,10 @@ else:
                 'common_mistakes': {},
                 'improvement_areas': []
             }
-        
+            self._initialize_trading()
+
+    def _initialize_trading(self):
+        """Initialize trading components (common for both cases)"""
         # Load config from .env file
         self.binance_api_key = os.getenv('BINANCE_API_KEY')
         self.binance_secret = os.getenv('BINANCE_SECRET_KEY')
@@ -669,7 +670,7 @@ else:
         ai_decision = self.get_ai_trading_decision(pair, market_data)
         
         # Check if this matches known mistake patterns
-        if LEARN_SCRIPT_AVAILABLE and self.should_avoid_trade(ai_decision, market_data):
+        if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'should_avoid_trade') and self.should_avoid_trade(ai_decision, market_data):
             self.print_color(f"🧠 AI USING LEARNING: Blocking potential mistake for {pair}", self.Fore.YELLOW)
             return {
                 "decision": "HOLD",
@@ -677,12 +678,12 @@ else:
                 "entry_price": market_data['current_price'],
                 "leverage": 10,
                 "confidence": 0,
-                "reasoning": f"Blocked - matches known error pattern. Learning from {len(self.mistakes_history)} past mistakes",
+                "reasoning": f"Blocked - matches known error pattern",
                 "should_reverse": False
             }
         
         # Add learning context to reasoning
-        if ai_decision["decision"] != "HOLD" and LEARN_SCRIPT_AVAILABLE:
+        if ai_decision["decision"] != "HOLD" and LEARN_SCRIPT_AVAILABLE and hasattr(self, 'mistakes_history'):
             learning_context = f" | Applying lessons from {len(self.mistakes_history)} past mistakes"
             ai_decision["reasoning"] += learning_context
         
