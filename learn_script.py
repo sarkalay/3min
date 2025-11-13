@@ -28,7 +28,8 @@ class SelfLearningAITrader:
                 with open(self.mistakes_history_file, 'r') as f:
                     return json.load(f)
             return []
-        except:
+        except Exception as e:
+            print(f"Error loading mistakes history: {e}")
             return []
     
     def save_mistakes_history(self):
