@@ -50,7 +50,7 @@ if not COLORAMA_AVAILABLE:
 
 # Use conditional inheritance
 if LEARN_SCRIPT_AVAILABLE:
-    class FullyAutonomous1HourAITrader(SelfLearningAITrader):
+class FullyAutonomous1HourAITrader(SelfLearningAITrader):
 else:
     class FullyAutonomous1HourAITrader(object):
 
