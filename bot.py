@@ -128,7 +128,7 @@ def _initialize_trading(self):
         self.print_color(f"💰 TOTAL BUDGET: ${self.total_budget}", self.Fore.GREEN + self.Style.BRIGHT)
         self.print_color(f"🔄 REVERSE POSITION FEATURE: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
         self.print_color(f"🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
-        self.print_color(f"⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
+        self.print_color(f"⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
         self.print_color(f"📊 Max Positions: {self.max_concurrent_trades}", self.Fore.YELLOW + self.Style.BRIGHT)
         if LEARN_SCRIPT_AVAILABLE:
             self.print_color(f"🧠 SELF-LEARNING AI: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
