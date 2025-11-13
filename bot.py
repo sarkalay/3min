@@ -94,7 +94,7 @@ def _initialize_trading(self):
     self.max_position_size_percent = 20  # Max 25% of budget per trade for 1hr
     self.max_concurrent_trades = 4  # Maximum concurrent positions
     
-    # AI can trade selected 4 major pairs only
+    # AI can trade selected 3 major pairs only
     self.available_pairs = [
         "BNBUSDT", "SOLUSDT", "AVAXUSDT"
     ]
@@ -653,7 +653,7 @@ def get_current_price(self, pair):
         else:
             # Mock prices for paper trading
             mock_prices = {
-                "BTCUSDT": 45000, "BNBUSDT": 300,
+                "BNBUSDT": 300,
                 "SOLUSDT": 180, "AVAXUSDT": 35
             }
             return mock_prices.get(pair, 100)
@@ -1139,7 +1139,7 @@ class FullyAutonomous1HourPaperTrader:
         self.paper_positions = {}
         self.paper_history_file = "fully_autonomous_1hour_paper_trading_history.json"
         self.paper_history = self.load_paper_history()
-        self.available_pairs = ["BTCUSDT", "BNBUSDT", "SOLUSDT", "AVAXUSDT"]
+        self.available_pairs = ["BNBUSDT", "SOLUSDT", "AVAXUSDT"]
         self.max_concurrent_trades = 6
         
         self.real_bot.print_color("🤖 FULLY AUTONOMOUS PAPER TRADER INITIALIZED!", self.Fore.GREEN + self.Style.BRIGHT)
