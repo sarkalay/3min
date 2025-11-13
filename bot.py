@@ -88,7 +88,7 @@ def _initialize_trading(self):
     # Thailand timezone
     self.thailand_tz = pytz.timezone('Asia/Bangkok')
     
-    # 🎯 FULLY AUTONOMOUS 1HOUR AI TRADING PARAMETERS
+    # 🎯 FULLY AUTONOMOUS AI TRADING PARAMETERS
     self.total_budget = 500  # $500 budget for AI to manage
     self.available_budget = 500  # Current available budget
     self.max_position_size_percent = 25  # Max 25% of budget per trade for 1hr
@@ -410,16 +410,39 @@ def parse_ai_trading_decision(self, ai_response, pair, current_price, current_tr
         return self.get_fallback_decision(pair, {'current_price': current_price})
 
 def get_fallback_decision(self, pair, market_data):
-    """Fallback decision if AI fails"""
-    return {
-        "decision": "HOLD",
-        "position_size_usd": 0,
-        "entry_price": market_data['current_price'],
-        "leverage": 10,
-        "confidence": 0,
-        "reasoning": "Fallback: AI analysis unavailable",
-        "should_reverse": False
-    }
+    """Better fallback decision that actually trades"""
+    current_price = market_data['current_price']
+    price_change = market_data.get('price_change', 0)
+    
+    # Simple trend following with some randomness
+    import random
+    if price_change > 1.5 or (abs(price_change) < 0.5 and random.random() < 0.7):
+        decision = "LONG"
+    elif price_change < -1.5 or (abs(price_change) < 0.5 and random.random() < 0.7):
+        decision = "SHORT"
+    else:
+        decision = "HOLD"
+    
+    if decision != "HOLD":
+        return {
+            "decision": decision,
+            "position_size_usd": 120,
+            "entry_price": current_price,
+            "leverage": 15,
+            "confidence": 65,
+            "reasoning": f"Fallback: {decision} based on market conditions",
+            "should_reverse": False
+        }
+    else:
+        return {
+            "decision": "HOLD",
+            "position_size_usd": 0,
+            "entry_price": current_price,
+            "leverage": 10,
+            "confidence": 40,
+            "reasoning": "Fallback: Waiting for better opportunity",
+            "should_reverse": False
+        }
 
 def calculate_current_pnl(self, trade, current_price):
     """Calculate current PnL percentage"""
@@ -1402,7 +1425,7 @@ class FullyAutonomous1HourPaperTrader:
             self.real_bot.print_color(f"❌ PAPER: Trade execution failed: {e}", self.Fore.RED)
             return False
 
-    def monitor_paper_positions(self):
+        def monitor_paper_positions(self):
         """Monitor paper positions and ask AI when to close"""
         try:
             closed_positions = []
@@ -1437,49 +1460,10 @@ class FullyAutonomous1HourPaperTrader:
             self.real_bot.print_color(f"PAPER: Monitoring error: {e}", self.Fore.RED)
             return []
 
-    def show_paper_trade_history(self, limit=15):
-        """Show PAPER trading history"""
-        if not self.paper_history:
-            self.real_bot.print_color("No PAPER trade history found", self.Fore.YELLOW)
-            return
-        
-        self.real_bot.print_color(f"\n📝 PAPER TRADING HISTORY (Last {min(limit, len(self.paper_history))} trades)", self.Fore.GREEN + self.Style.BRIGHT)
-        self.real_bot.print_color("=" * 120, self.Fore.GREEN)
-        
-        recent_trades = self.paper_history[-limit:]
-        for i, trade in enumerate(reversed(recent_trades)):
-            pnl = trade.get('pnl', 0)
-            pnl_color = self.Fore.GREEN + self.Style.BRIGHT if pnl > 0 else self.Fore.RED + self.Style.BRIGHT if pnl < 0 else self.Fore.YELLOW
-            direction_icon = "🟢 LONG" if trade['direction'] == 'LONG' else "🔴 SHORT"
-            position_size = trade.get('position_size_usd', 0)
-            leverage = trade.get('leverage', 1)
-            
-            self.real_bot.print_color(f"{i+1:2d}. {direction_icon} {trade['pair']} | Size: ${position_size:.2f} | Leverage: {leverage}x | P&L: ${pnl:.2f}", pnl_color)
-            self.real_bot.print_color(f"     Entry: ${trade.get('entry_price', 0):.4f} | Exit: ${trade.get('exit_price', 0):.4f} | {trade.get('close_reason', 'N/A')}", self.Fore.YELLOW)
-
-    def get_paper_portfolio_status(self):
-        """Show paper trading portfolio status"""
-        total_trades = len(self.paper_history)
-        winning_trades = len([t for t in self.paper_history if t.get('pnl', 0) > 0])
-        total_pnl = sum(trade.get('pnl', 0) for trade in self.paper_history)
-        
-        self.real_bot.print_color(f"\n📊 PAPER TRADING PORTFOLIO", self.Fore.CYAN + self.Style.BRIGHT)
-        self.real_bot.print_color("=" * 70, self.Fore.CYAN)
-        self.real_bot.print_color(f"Active Positions: {len(self.paper_positions)}/6", self.Fore.WHITE)
-        self.real_bot.print_color(f"Available Budget: ${self.available_budget:.2f}", self.Fore.WHITE + self.Style.BRIGHT)
-        self.real_bot.print_color(f"Total Paper Trades: {total_trades}", self.Fore.WHITE)
-        
-        if total_trades > 0:
-            win_rate = (winning_trades / total_trades) * 100
-            self.real_bot.print_color(f"Paper Win Rate: {win_rate:.1f}%", self.Fore.GREEN + self.Style.BRIGHT if win_rate > 50 else self.Fore.YELLOW)
-            self.real_bot.print_color(f"Total Paper P&L: ${total_pnl:.2f}", self.Fore.GREEN + self.Style.BRIGHT if total_pnl > 0 else self.Fore.RED + self.Style.BRIGHT)
-            avg_trade = total_pnl / total_trades
-            self.real_bot.print_color(f"Average Paper P&L: ${avg_trade:.2f}", self.Fore.WHITE)
-
     def display_paper_dashboard(self):
         """Display paper trading dashboard"""
-        self.real_bot.print_color(f"\n🤖 PAPER TRADING DASHBOARD - {self.real_bot.get_thailand_time()}", self.Fore.GREEN + self.Style.BRIGHT)
-        self.real_bot.print_color("=" * 90, self.Fore.GREEN)
+        self.real_bot.print_color(f"\n🤖 PAPER TRADING DASHBOARD - {self.real_bot.get_thailand_time()}", self.Fore.CYAN + self.Style.BRIGHT)
+        self.real_bot.print_color("=" * 90, self.Fore.CYAN)
         self.real_bot.print_color(f"🎯 MODE: NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
         self.real_bot.print_color(f"⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
         
@@ -1506,63 +1490,105 @@ class FullyAutonomous1HourPaperTrader:
                 self.real_bot.print_color(f"   Entry: ${trade['entry_price']:.4f} | Current: ${current_price:.4f}", self.Fore.WHITE)
                 self.real_bot.print_color(f"   P&L: ${unrealized_pnl:.2f}", pnl_color)
                 self.real_bot.print_color(f"   🎯 NO TP/SL - AI Monitoring Every 3min", self.Fore.YELLOW)
-                self.real_bot.print_color("   " + "-" * 60, self.Fore.GREEN)
+                self.real_bot.print_color("   " + "-" * 60, self.Fore.CYAN)
         
         if active_count == 0:
             self.real_bot.print_color("No active paper positions", self.Fore.YELLOW)
         else:
             total_color = self.Fore.GREEN + self.Style.BRIGHT if total_unrealized >= 0 else self.Fore.RED + self.Style.BRIGHT
-            self.real_bot.print_color(f"📊 Active Paper Positions: {active_count}/6 | Total Unrealized P&L: ${total_unrealized:.2f}", total_color)
+            self.real_bot.print_color(f"📊 Active Paper Positions: {active_count}/{self.max_concurrent_trades} | Total Unrealized P&L: ${total_unrealized:.2f}", total_color)
+        
+        self.real_bot.print_color(f"💰 Paper Balance: ${self.paper_balance:.2f} | Available: ${self.available_budget:.2f}", self.Fore.GREEN + self.Style.BRIGHT)
+
+    def show_paper_history(self, limit=10):
+        """Show paper trading history"""
+        if not self.paper_history:
+            self.real_bot.print_color("No paper trade history found", self.Fore.YELLOW)
+            return
+        
+        self.real_bot.print_color(f"\n📊 PAPER TRADING HISTORY (Last {min(limit, len(self.paper_history))} trades)", self.Fore.CYAN + self.Style.BRIGHT)
+        self.real_bot.print_color("=" * 120, self.Fore.CYAN)
+        
+        recent_trades = self.paper_history[-limit:]
+        for i, trade in enumerate(reversed(recent_trades)):
+            pnl = trade.get('pnl', 0)
+            pnl_color = self.Fore.GREEN + self.Style.BRIGHT if pnl > 0 else self.Fore.RED + self.Style.BRIGHT if pnl < 0 else self.Fore.YELLOW
+            direction_icon = "🟢 LONG" if trade['direction'] == 'LONG' else "🔴 SHORT"
+            position_size = trade.get('position_size_usd', 0)
+            leverage = trade.get('leverage', 1)
+            
+            self.real_bot.print_color(f"{i+1:2d}. {direction_icon} {trade['pair']} | Size: ${position_size:.2f} | Leverage: {leverage}x | P&L: ${pnl:.2f}", pnl_color)
+            self.real_bot.print_color(f"     Entry: ${trade.get('entry_price', 0):.4f} | Exit: ${trade.get('exit_price', 0):.4f} | {trade.get('close_reason', 'N/A')}", self.Fore.YELLOW)
+
+    def show_paper_stats(self):
+        """Show paper trading statistics"""
+        if not self.paper_history:
+            return
+            
+        total_trades = len(self.paper_history)
+        winning_trades = len([t for t in self.paper_history if t.get('pnl', 0) > 0])
+        total_pnl = sum(t.get('pnl', 0) for t in self.paper_history)
+        
+        if total_trades == 0:
+            return
+            
+        win_rate = (winning_trades / total_trades) * 100
+        avg_trade = total_pnl / total_trades
+        
+        self.real_bot.print_color(f"\n📈 PAPER TRADING STATISTICS", self.Fore.GREEN + self.Style.BRIGHT)
+        self.real_bot.print_color("=" * 60, self.Fore.GREEN)
+        self.real_bot.print_color(f"Total Paper Trades: {total_trades} | Winning Trades: {winning_trades}", self.Fore.WHITE)
+        self.real_bot.print_color(f"Paper Win Rate: {win_rate:.1f}%", self.Fore.GREEN + self.Style.BRIGHT if win_rate > 50 else self.Fore.YELLOW)
+        self.real_bot.print_color(f"Total Paper P&L: ${total_pnl:.2f}", self.Fore.GREEN + self.Style.BRIGHT if total_pnl > 0 else self.Fore.RED + self.Style.BRIGHT)
+        self.real_bot.print_color(f"Average P&L per Paper Trade: ${avg_trade:.2f}", self.Fore.WHITE)
 
     def run_paper_trading_cycle(self):
-        """Run one complete paper trading cycle with REVERSE feature and AI manual close"""
+        """Run paper trading cycle"""
         try:
+            # First monitor and ask AI to close paper positions
             self.monitor_paper_positions()
             self.display_paper_dashboard()
             
-            # Show paper history every 10 cycles (10 minutes)
-            if hasattr(self, 'paper_cycle_count') and self.paper_cycle_count % 10 == 0:
-                self.show_paper_trade_history(8)
+            # Show stats periodically
+            if hasattr(self, 'paper_cycle_count') and self.paper_cycle_count % 5 == 0:
+                self.show_paper_history(8)
+                self.show_paper_stats()
             
-            self.get_paper_portfolio_status()
-            
-            self.real_bot.print_color(f"\n🔍 DEEPSEEK SCANNING FOR PAPER TRADES WITH ${self.available_budget:.2f} AVAILABLE...", self.Fore.BLUE + self.Style.BRIGHT)
+            self.real_bot.print_color(f"\n🔍 PAPER: DEEPSEEK SCANNING {len(self.available_pairs)} PAIRS...", self.Fore.BLUE + self.Style.BRIGHT)
             
             qualified_signals = 0
             for pair in self.available_pairs:
                 if self.available_budget > 100:
                     market_data = self.real_bot.get_price_history(pair)
                     
-                    # Pass current trade to AI for reverse analysis
-                    current_trade = self.paper_positions.get(pair)
-                    ai_decision = self.real_bot.get_ai_trading_decision(pair, market_data, current_trade)
+                    # Use learning-enhanced AI decision for paper trading too
+                    ai_decision = self.real_bot.get_ai_decision_with_learning(pair, market_data)
                     
                     if ai_decision["decision"] != "HOLD" and ai_decision["position_size_usd"] > 0:
                         qualified_signals += 1
                         direction = ai_decision['decision']
+                        leverage_info = f"Leverage: {ai_decision['leverage']}x"
                         
                         if direction.startswith('REVERSE_'):
                             self.real_bot.print_color(f"🔄 PAPER REVERSE SIGNAL: {pair} {direction} | Size: ${ai_decision['position_size_usd']:.2f}", self.Fore.YELLOW + self.Style.BRIGHT)
                         else:
-                            leverage_info = f"Leverage: {ai_decision['leverage']}x"
                             self.real_bot.print_color(f"🎯 PAPER TRADE SIGNAL: {pair} {direction} | Size: ${ai_decision['position_size_usd']:.2f} | {leverage_info}", self.Fore.GREEN + self.Style.BRIGHT)
                         
-                        self.paper_execute_trade(pair, ai_decision)
-                        time.sleep(1)  # Reduced delay for faster 3min cycles
-                
-            if qualified_signals > 0:
-                self.real_bot.print_color(f"🎯 {qualified_signals} qualified paper signals executed", self.Fore.GREEN + self.Style.BRIGHT)
-            else:
-                self.real_bot.print_color("No qualified paper signals this cycle", self.Fore.YELLOW)
+                        success = self.paper_execute_trade(pair, ai_decision)
+                        if success:
+                            time.sleep(1)  # Short delay between paper trades
             
+            if qualified_signals == 0:
+                self.real_bot.print_color("PAPER: No qualified DeepSeek signals this cycle", self.Fore.YELLOW)
+                
         except Exception as e:
             self.real_bot.print_color(f"PAPER: Trading cycle error: {e}", self.Fore.RED)
 
     def start_paper_trading(self):
-        """Start paper trading with REVERSE feature and NO TP/SL"""
-        self.real_bot.print_color("🚀 STARTING PAPER TRADING WITH 3MINUTE MONITORING!", self.Fore.GREEN + self.Style.BRIGHT)
-        self.real_bot.print_color("💰 VIRTUAL $500 BUDGET - NO REAL MONEY", self.Fore.CYAN + self.Style.BRIGHT)
-        self.real_bot.print_color("🔄 REVERSE POSITION: ENABLED (AI can flip losing positions)", self.Fore.MAGENTA + self.Style.BRIGHT)
+        """Start paper trading"""
+        self.real_bot.print_color("🚀 STARTING PAPER TRADING WITH 3MINUTE MONITORING!", self.Fore.CYAN + self.Style.BRIGHT)
+        self.real_bot.print_color("💰 VIRTUAL $500 PORTFOLIO", self.Fore.GREEN + self.Style.BRIGHT)
+        self.real_bot.print_color("🔄 REVERSE POSITION: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
         self.real_bot.print_color("🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
         self.real_bot.print_color("⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
         
@@ -1570,65 +1596,72 @@ class FullyAutonomous1HourPaperTrader:
         while True:
             try:
                 self.paper_cycle_count += 1
-                self.real_bot.print_color(f"\n🔄 PAPER TRADING CYCLE {self.paper_cycle_count} (3MIN INTERVAL)", self.Fore.GREEN)
-                self.real_bot.print_color("=" * 60, self.Fore.GREEN)
+                self.real_bot.print_color(f"\n🔄 PAPER TRADING CYCLE {self.paper_cycle_count} (3MIN INTERVAL)", self.Fore.CYAN + self.Style.BRIGHT)
+                self.real_bot.print_color("=" * 60, self.Fore.CYAN)
                 self.run_paper_trading_cycle()
-                self.real_bot.print_color(f"⏳ DeepSeek analyzing next paper opportunities in 3 minute...", self.Fore.BLUE)
+                self.real_bot.print_color(f"⏳ Next paper analysis in 3 minute...", self.Fore.BLUE)
                 time.sleep(self.monitoring_interval)
                 
             except KeyboardInterrupt:
                 self.real_bot.print_color(f"\n🛑 PAPER TRADING STOPPED", self.Fore.RED + self.Style.BRIGHT)
-                
-                # Show final paper trading results
-                total_trades = len(self.paper_history)
-                if total_trades > 0:
-                    winning_trades = len([t for t in self.paper_history if t.get('pnl', 0) > 0])
-                    total_pnl = sum(trade.get('pnl', 0) for trade in self.paper_history)
-                    win_rate = (winning_trades / total_trades) * 100
-                    
-                    self.real_bot.print_color(f"\n📊 FINAL PAPER TRADING RESULTS", self.Fore.CYAN + self.Style.BRIGHT)
-                    self.real_bot.print_color("=" * 50, self.Fore.CYAN)
-                    self.real_bot.print_color(f"Total Paper Trades: {total_trades}", self.Fore.WHITE)
-                    self.real_bot.print_color(f"Paper Win Rate: {win_rate:.1f}%", self.Fore.GREEN)
-                    self.real_bot.print_color(f"Total Paper P&L: ${total_pnl:.2f}", self.Fore.GREEN if total_pnl > 0 else self.Fore.RED)
-                    self.real_bot.print_color(f"Final Paper Balance: ${self.paper_balance:.2f}", self.Fore.CYAN + self.Style.BRIGHT)
-                
+                self.show_paper_history(15)
+                self.show_paper_stats()
                 break
             except Exception as e:
-                self.real_bot.print_color(f"PAPER: Trading error: {e}", self.Fore.RED)
+                self.real_bot.print_color(f"PAPER: Main loop error: {e}", self.Fore.RED)
                 time.sleep(self.monitoring_interval)
-                
+
+# Add paper trading methods to the class
+paper_methods = [
+    load_paper_history, save_paper_history, add_paper_trade_to_history,
+    calculate_current_pnl, paper_execute_reverse_position, paper_close_trade_immediately,
+    get_ai_close_decision, paper_execute_trade, monitor_paper_positions,
+    display_paper_dashboard, show_paper_history, show_paper_stats,
+    run_paper_trading_cycle, start_paper_trading
+]
+
+for method in paper_methods:
+    setattr(FullyAutonomous1HourPaperTrader, method.__name__, method)
+
+# Main execution
 if __name__ == "__main__":
     try:
-        ai_trader = FullyAutonomous1HourAITrader()
+        # Create the main bot
+        bot = FullyAutonomous1HourAITrader()
         
-        print("\n" + "="*80)
-        print("🤖 AI TRADER WITH 3MINUTE MONITORING & ENHANCED REVERSE FEATURE")
-        print("="*80)
-        print("SELECT MODE:")
-        print("1. 🚀 Live Trading (Real Money)")
-        print("2. 💸 Paper Trading (Virtual Money)")
+        # Ask user for mode selection
+        print("\n" + "="*70)
+        print("🤖 FULLY AUTONOMOUS 1-HOUR AI TRADER")
+        print("="*70)
+        print("1. 🎯 REAL TRADING (Live Binance Account)")
+        print("2. 📝 PAPER TRADING (Virtual Simulation)")
+        print("3. ❌ EXIT")
         
-        choice = input("Enter choice (1-2): ").strip()
+        choice = input("\nSelect mode (1-3): ").strip()
         
         if choice == "1":
-            print("⚠️  WARNING: REAL MONEY TRADING! ⚠️")
-            print("🔄 REVERSE POSITION FEATURE: ENABLED")
-            print("🎯 NO TP/SL - AI MANUAL CLOSE ONLY")
-            print("⏰ MONITORING: 3 MINUTE INTERVAL")
-            print("⚡ AI CAN FLIP LOSING POSITIONS (WITH CONFIRMATION)")
-            if LEARN_SCRIPT_AVAILABLE:
-                print("🧠 SELF-LEARNING AI: ENABLED")
-            confirm = input("Type '3MINUTE' to confirm: ").strip()
-            if confirm.upper() == '3MINUTE':
-                ai_trader.start_trading()
+            if bot.binance:
+                print(f"\n🚀 STARTING REAL TRADING...")
+                bot.start_trading()
             else:
-                print("Using Paper Trading mode instead...")
-                paper_bot = FullyAutonomous1HourPaperTrader(ai_trader)
+                print(f"\n❌ Binance connection failed. Switching to paper trading...")
+                paper_bot = FullyAutonomous1HourPaperTrader(bot)
                 paper_bot.start_paper_trading()
-        else:
-            paper_bot = FullyAutonomous1HourPaperTrader(ai_trader)
+                
+        elif choice == "2":
+            print(f"\n📝 STARTING PAPER TRADING...")
+            paper_bot = FullyAutonomous1HourPaperTrader(bot)
             paper_bot.start_paper_trading()
             
+        elif choice == "3":
+            print(f"\n👋 Exiting...")
+            
+        else:
+            print(f"\n❌ Invalid choice. Exiting...")
+            
+    except KeyboardInterrupt:
+        print(f"\n🛑 Program stopped by user")
     except Exception as e:
-        print(f"Failed to start AI trader: {e}")
+        print(f"\n❌ Main execution error: {e}")
+        import traceback
+        traceback.print_exc()
