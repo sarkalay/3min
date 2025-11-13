@@ -309,7 +309,7 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
 
         {learning_context}
 
-        MARKET ANALYSIS FOR {pair} (1MINUTE MONITORING):
+        MARKET ANALYSIS FOR {pair} (3MINUTE MONITORING):
         - Current Price: ${current_price:.6f}
         - 1Hour Price Change: {market_data.get('price_change', 0):.2f}%
         - Support/Resistance Levels: {market_data.get('support_levels', [])} / {market_data.get('resistance_levels', [])}
@@ -356,7 +356,7 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
             "max_tokens": 800
         }
         
-        self.print_color(f"🧠 DeepSeek Analyzing {pair} with 1MIN monitoring...", self.Fore.MAGENTA + self.Style.BRIGHT)
+        self.print_color(f"🧠 DeepSeek Analyzing {pair} with 3MIN monitoring...", self.Fore.MAGENTA + self.Style.BRIGHT)
         response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=60)
         
         if response.status_code == 200:
@@ -822,7 +822,7 @@ def get_ai_close_decision(self, pair, trade):
         current_pnl = self.calculate_current_pnl(trade, current_price)
         
         prompt = f"""
-        SHOULD WE CLOSE THIS POSITION? (1MINUTE MONITORING)
+        SHOULD WE CLOSE THIS POSITION? (3MINUTE MONITORING)
         
         CURRENT ACTIVE TRADE:
         - Pair: {pair}
@@ -964,7 +964,7 @@ def display_dashboard(self):
             self.print_color(f"   Size: ${trade['position_size_usd']:.2f} | Leverage: {trade['leverage']}x ⚡", self.Fore.WHITE)
             self.print_color(f"   Entry: ${trade['entry_price']:.4f} | Current: ${current_price:.4f}", self.Fore.WHITE)
             self.print_color(f"   P&L: ${unrealized_pnl:.2f}", pnl_color)
-            self.print_color(f"   🎯 NO TP/SL - AI Monitoring Every 1min", self.Fore.YELLOW)
+            self.print_color(f"   🎯 NO TP/SL - AI Monitoring Every 3min", self.Fore.YELLOW)
             self.print_color("   " + "-" * 60, self.Fore.CYAN)
     
     if active_count == 0:
@@ -1043,7 +1043,7 @@ def run_trading_cycle(self):
                     
                     success = self.execute_ai_trade(pair, ai_decision)
                     if success:
-                        time.sleep(2)  # Reduced delay for faster 1min cycles
+                        time.sleep(2)  # Reduced delay for faster 3min cycles
             
         if qualified_signals == 0:
             self.print_color("No qualified DeepSeek signals this cycle", self.Fore.YELLOW)
@@ -1053,7 +1053,7 @@ def run_trading_cycle(self):
 
 def start_trading(self):
     """Start trading with REVERSE position feature and NO TP/SL"""
-    self.print_color("🚀 STARTING AI TRADER WITH 1MINUTE MONITORING!", self.Fore.CYAN + self.Style.BRIGHT)
+    self.print_color("🚀 STARTING AI TRADER WITH 3MINUTE MONITORING!", self.Fore.CYAN + self.Style.BRIGHT)
     self.print_color("💰 AI MANAGING $500 PORTFOLIO", self.Fore.GREEN + self.Style.BRIGHT)
     self.print_color("🔄 REVERSE POSITION: ENABLED (AI can flip losing positions)", self.Fore.MAGENTA + self.Style.BRIGHT)
     self.print_color("🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
@@ -1066,11 +1066,11 @@ def start_trading(self):
     while True:
         try:
             self.cycle_count += 1
-            self.print_color(f"\n🔄 TRADING CYCLE {self.cycle_count} (1MIN INTERVAL)", self.Fore.CYAN + self.Style.BRIGHT)
+            self.print_color(f"\n🔄 TRADING CYCLE {self.cycle_count} (3MIN INTERVAL)", self.Fore.CYAN + self.Style.BRIGHT)
             self.print_color("=" * 60, self.Fore.CYAN)
             self.run_trading_cycle()
-            self.print_color(f"⏳ Next analysis in 1 minute...", self.Fore.BLUE)
-            time.sleep(self.monitoring_interval)  # 1 minute
+            self.print_color(f"⏳ Next analysis in 3 minute...", self.Fore.BLUE)
+            time.sleep(self.monitoring_interval)  # 3 minute
             
         except KeyboardInterrupt:
             self.print_color(f"\n🛑 TRADING STOPPED", self.Fore.RED + self.Style.BRIGHT)
@@ -1257,7 +1257,7 @@ class FullyAutonomous1HourPaperTrader:
             current_pnl = self.calculate_current_pnl(trade, current_price)
             
             prompt = f"""
-            SHOULD WE CLOSE THIS PAPER TRADING POSITION? (1MINUTE MONITORING)
+            SHOULD WE CLOSE THIS PAPER TRADING POSITION? (3MINUTE MONITORING)
             
             CURRENT ACTIVE PAPER TRADE:
             - Pair: {pair}
@@ -1505,7 +1505,7 @@ class FullyAutonomous1HourPaperTrader:
                 self.real_bot.print_color(f"   Size: ${trade['position_size_usd']:.2f} | Leverage: {trade['leverage']}x ⚡", self.Fore.WHITE)
                 self.real_bot.print_color(f"   Entry: ${trade['entry_price']:.4f} | Current: ${current_price:.4f}", self.Fore.WHITE)
                 self.real_bot.print_color(f"   P&L: ${unrealized_pnl:.2f}", pnl_color)
-                self.real_bot.print_color(f"   🎯 NO TP/SL - AI Monitoring Every 1min", self.Fore.YELLOW)
+                self.real_bot.print_color(f"   🎯 NO TP/SL - AI Monitoring Every 3min", self.Fore.YELLOW)
                 self.real_bot.print_color("   " + "-" * 60, self.Fore.GREEN)
         
         if active_count == 0:
@@ -1548,7 +1548,7 @@ class FullyAutonomous1HourPaperTrader:
                             self.real_bot.print_color(f"🎯 PAPER TRADE SIGNAL: {pair} {direction} | Size: ${ai_decision['position_size_usd']:.2f} | {leverage_info}", self.Fore.GREEN + self.Style.BRIGHT)
                         
                         self.paper_execute_trade(pair, ai_decision)
-                        time.sleep(1)  # Reduced delay for faster 1min cycles
+                        time.sleep(1)  # Reduced delay for faster 3min cycles
                 
             if qualified_signals > 0:
                 self.real_bot.print_color(f"🎯 {qualified_signals} qualified paper signals executed", self.Fore.GREEN + self.Style.BRIGHT)
@@ -1560,17 +1560,17 @@ class FullyAutonomous1HourPaperTrader:
 
     def start_paper_trading(self):
         """Start paper trading with REVERSE feature and NO TP/SL"""
-        self.real_bot.print_color("🚀 STARTING PAPER TRADING WITH 1MINUTE MONITORING!", self.Fore.GREEN + self.Style.BRIGHT)
+        self.real_bot.print_color("🚀 STARTING PAPER TRADING WITH 3MINUTE MONITORING!", self.Fore.GREEN + self.Style.BRIGHT)
         self.real_bot.print_color("💰 VIRTUAL $500 BUDGET - NO REAL MONEY", self.Fore.CYAN + self.Style.BRIGHT)
         self.real_bot.print_color("🔄 REVERSE POSITION: ENABLED (AI can flip losing positions)", self.Fore.MAGENTA + self.Style.BRIGHT)
         self.real_bot.print_color("🎯 NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
-        self.real_bot.print_color("⏰ MONITORING: 1 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
+        self.real_bot.print_color("⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
         
         self.paper_cycle_count = 0
         while True:
             try:
                 self.paper_cycle_count += 1
-                self.real_bot.print_color(f"\n🔄 PAPER TRADING CYCLE {self.paper_cycle_count} (1MIN INTERVAL)", self.Fore.GREEN)
+                self.real_bot.print_color(f"\n🔄 PAPER TRADING CYCLE {self.paper_cycle_count} (3MIN INTERVAL)", self.Fore.GREEN)
                 self.real_bot.print_color("=" * 60, self.Fore.GREEN)
                 self.run_paper_trading_cycle()
                 self.real_bot.print_color(f"⏳ DeepSeek analyzing next paper opportunities in 1 minute...", self.Fore.BLUE)
@@ -1603,7 +1603,7 @@ if __name__ == "__main__":
         ai_trader = FullyAutonomous1HourAITrader()
         
         print("\n" + "="*80)
-        print("🤖 AI TRADER WITH 1MINUTE MONITORING & ENHANCED REVERSE FEATURE")
+        print("🤖 AI TRADER WITH 3MINUTE MONITORING & ENHANCED REVERSE FEATURE")
         print("="*80)
         print("SELECT MODE:")
         print("1. 🚀 Live Trading (Real Money)")
@@ -1615,12 +1615,12 @@ if __name__ == "__main__":
             print("⚠️  WARNING: REAL MONEY TRADING! ⚠️")
             print("🔄 REVERSE POSITION FEATURE: ENABLED")
             print("🎯 NO TP/SL - AI MANUAL CLOSE ONLY")
-            print("⏰ MONITORING: 1 MINUTE INTERVAL")
+            print("⏰ MONITORING: 3 MINUTE INTERVAL")
             print("⚡ AI CAN FLIP LOSING POSITIONS (WITH CONFIRMATION)")
             if LEARN_SCRIPT_AVAILABLE:
                 print("🧠 SELF-LEARNING AI: ENABLED")
-            confirm = input("Type '1MINUTE' to confirm: ").strip()
-            if confirm.upper() == '1MINUTE':
+            confirm = input("Type '3MINUTE' to confirm: ").strip()
+            if confirm.upper() == '3MINUTE':
                 ai_trader.start_trading()
             else:
                 print("Using Paper Trading mode instead...")
