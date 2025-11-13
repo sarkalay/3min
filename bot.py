@@ -118,8 +118,8 @@ def _initialize_trading(self):
     # NEW: Reverse position settings
     self.allow_reverse_positions = True  # Enable reverse position feature
     
-    # NEW: Monitoring interval (1 minute)
-    self.monitoring_interval = 60  # 1 minute in seconds
+    # NEW: Monitoring interval (3 minute)
+    self.monitoring_interval = 180  # 3 minute in seconds
     
     # Initialize Binance client
     try:
