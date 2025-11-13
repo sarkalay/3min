@@ -21,6 +21,10 @@ class SelfLearningAITrader:
             'improvement_areas': []
         }
     
+    def print_color(self, text, color=""):
+        """Add this missing method"""
+        print(text)
+    
     def load_mistakes_history(self):
         """Load AI's mistake history"""
         try:
@@ -38,7 +42,7 @@ class SelfLearningAITrader:
             with open(self.mistakes_history_file, 'w') as f:
                 json.dump(self.mistakes_history, f, indent=2)
         except Exception as e:
-            self.print_color(f"Error saving mistakes history: {e}", self.Fore.RED)
+            self.print_color(f"Error saving mistakes history: {e}", "RED")  # Fixed this line
     
     def analyze_trade_mistake(self, trade):
         """Analyze what went wrong in a losing trade"""
@@ -57,7 +61,7 @@ class SelfLearningAITrader:
             
             return mistake_analysis
         except Exception as e:
-            self.print_color(f"Mistake analysis error: {e}", self.Fore.RED)
+            self.print_color(f"Mistake analysis error: {e}", "RED")  # Fixed this line
             return None
     
     def identify_mistake_type(self, trade):
@@ -128,8 +132,8 @@ class SelfLearningAITrader:
             self.save_mistakes_history()
             self.update_learned_patterns(mistake_analysis)
             
-            self.print_color(f"🧠 AI LEARNING: {mistake_analysis['lesson_learned']}", self.Fore.YELLOW)
-            self.print_color(f"🛡️  AVOIDANCE: {mistake_analysis['avoidance_strategy']}", self.Fore.CYAN)
+            self.print_color(f"🧠 AI LEARNING: {mistake_analysis['lesson_learned']}", "YELLOW")  # Fixed
+            self.print_color(f"🛡️  AVOIDANCE: {mistake_analysis['avoidance_strategy']}", "CYAN")  # Fixed
     
     def update_learned_patterns(self, mistake_analysis):
         """Update AI's learned patterns based on mistakes"""
@@ -204,7 +208,7 @@ class SelfLearningAITrader:
         # Check against learned mistake patterns
         for mistake_type, pattern_data in self.learned_patterns.items():
             if self.matches_mistake_pattern(ai_decision, market_data, mistake_type):
-                self.print_color(f"🚫 BLOCKED: This matches previous '{mistake_type}' error pattern", self.Fore.RED)
+                self.print_color(f"🚫 BLOCKED: This matches previous '{mistake_type}' error pattern", "RED")  # Fixed
                 return True
         
         return False
@@ -252,7 +256,7 @@ class SelfLearningAITrader:
         
         # Check if this matches known mistake patterns
         if self.should_avoid_trade(ai_decision, market_data):
-            self.print_color(f"🧠 AI USING LEARNING: Blocking potential mistake for {pair}", self.Fore.YELLOW)
+            self.print_color(f"🧠 AI USING LEARNING: Blocking potential mistake for {pair}", "YELLOW")  # Fixed
             return {
                 "decision": "HOLD",
                 "position_size_usd": 0,
@@ -275,23 +279,23 @@ class SelfLearningAITrader:
         total_mistakes = len(self.mistakes_history)
         common_mistakes = self.get_most_common_mistakes()
         
-        self.print_color(f"\n🧠 AI LEARNING PROGRESS REPORT", self.Fore.CYAN + self.Style.BRIGHT)
-        self.print_color("=" * 60, self.Fore.CYAN)
-        self.print_color(f"Total Mistakes Learned From: {total_mistakes}", self.Fore.WHITE)
-        self.print_color(f"Total Trades: {self.performance_stats['total_trades']}", self.Fore.WHITE)
+        self.print_color(f"\n🧠 AI LEARNING PROGRESS REPORT", "CYAN")  # Fixed
+        self.print_color("=" * 60, "CYAN")  # Fixed
+        self.print_color(f"Total Mistakes Learned From: {total_mistakes}", "WHITE")  # Fixed
+        self.print_color(f"Total Trades: {self.performance_stats['total_trades']}", "WHITE")  # Fixed
         
         if total_mistakes > 0:
             mistake_rate = (self.performance_stats['losing_trades'] / self.performance_stats['total_trades']) * 100
-            self.print_color(f"Mistake Rate: {mistake_rate:.1f}%", 
-                           self.Fore.GREEN if mistake_rate < 30 else self.Fore.YELLOW)
+            color = "GREEN" if mistake_rate < 30 else "YELLOW"
+            self.print_color(f"Mistake Rate: {mistake_rate:.1f}%", color)  # Fixed
         
-        self.print_color(f"\n📊 MOST COMMON MISTAKES:", self.Fore.YELLOW)
+        self.print_color(f"\n📊 MOST COMMON MISTAKES:", "YELLOW")  # Fixed
         for mistake, count in common_mistakes.items():
-            self.print_color(f"  {mistake}: {count} occurrences", self.Fore.WHITE)
+            self.print_color(f"  {mistake}: {count} occurrences", "WHITE")  # Fixed
         
-        self.print_color(f"\n🛡️  ACTIVE PROTECTIONS:", self.Fore.GREEN)
+        self.print_color(f"\n🛡️  ACTIVE PROTECTIONS:", "GREEN")  # Fixed
         for mistake_type in common_mistakes.keys():
-            self.print_color(f"  ✓ Blocking {mistake_type} patterns", self.Fore.GREEN)
+            self.print_color(f"  ✓ Blocking {mistake_type} patterns", "GREEN")  # Fixed
 
 # Integrate into main trading class
 class FullyAutonomousAITrader(SelfLearningAITrader):
