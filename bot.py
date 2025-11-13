@@ -1610,11 +1610,20 @@ class FullyAutonomous1HourPaperTrader:
 
 # Add paper trading methods to the class
 paper_methods = [
-    load_paper_history, save_paper_history, add_paper_trade_to_history,
-    calculate_current_pnl, paper_execute_reverse_position, paper_close_trade_immediately,
-    get_ai_close_decision, paper_execute_trade, monitor_paper_positions,
-    display_paper_dashboard, show_paper_history, show_paper_stats,
-    run_paper_trading_cycle, start_paper_trading
+    FullyAutonomous1HourPaperTrader.load_paper_history,
+    FullyAutonomous1HourPaperTrader.save_paper_history,
+    FullyAutonomous1HourPaperTrader.add_paper_trade_to_history,
+    FullyAutonomous1HourPaperTrader.calculate_current_pnl,
+    FullyAutonomous1HourPaperTrader.paper_execute_reverse_position,
+    FullyAutonomous1HourPaperTrader.paper_close_trade_immediately,
+    FullyAutonomous1HourPaperTrader.get_ai_close_decision,
+    FullyAutonomous1HourPaperTrader.paper_execute_trade,
+    FullyAutonomous1HourPaperTrader.monitor_paper_positions,
+    FullyAutonomous1HourPaperTrader.display_paper_dashboard,
+    FullyAutonomous1HourPaperTrader.show_paper_history,
+    FullyAutonomous1HourPaperTrader.show_paper_stats,
+    FullyAutonomous1HourPaperTrader.run_paper_trading_cycle,
+    FullyAutonomous1HourPaperTrader.start_paper_trading
 ]
 
 for method in paper_methods:
