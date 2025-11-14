@@ -395,7 +395,7 @@ def get_market_news_sentiment(self):
             "reasoning": "MTF alignment + signal + risk"
         }}
         """
-        headers = {
+             headers = {
             "Authorization": f"Bearer {self.openrouter_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://github.com",
