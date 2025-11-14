@@ -305,7 +305,7 @@ def get_market_news_sentiment(self):
     except:
         return "General crypto market news monitoring"
 
-def get_ai_trading_decision(self, pair, market_data, current_trade=None):
+    def get_ai_trading_decision(self, pair, market_data, current_trade=None):
         """AI makes COMPLETE trading decisions including REVERSE positions"""
         try:
             if not self.openrouter_key:
@@ -314,43 +314,43 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
             current_price = market_data.get('current_price', 0)
             mtf = market_data.get('mtf_analysis', {})
 
-        # === MULTI-TIMEFRAME TEXT SUMMARY ===
-        mtf_text = "MULTI-TIMEFRAME ANALYSIS:\n"
-        for tf in ['5m', '15m', '1h', '4h', '1d']:
-            if tf in mtf:
-                d = mtf[tf]
-                mtf_text += f"- {tf.upper()}: {d.get('trend', 'N/A')} | "
-                if 'crossover' in d:
-                    mtf_text += f"Signal: {d['crossover']} | "
-                if 'rsi' in d:
-                    mtf_text += f"RSI: {d['rsi']} | "
-                if 'vol_spike' in d:
-                    mtf_text += f"Vol: {'SPIKE' if d['vol_spike'] else 'Normal'} | "
-                if 'support' in d and 'resistance' in d:
-                    mtf_text += f"S/R: {d['support']:.4f}/{d['resistance']:.4f}"
-                mtf_text += "\n"
+            # === MULTI-TIMEFRAME TEXT SUMMARY ===
+            mtf_text = "MULTI-TIMEFRAME ANALYSIS:\n"
+            for tf in ['5m', '15m', '1h', '4h', '1d']:
+                if tf in mtf:
+                    d = mtf[tf]
+                    mtf_text += f"- {tf.upper()}: {d.get('trend', 'N/A')} | "
+                    if 'crossover' in d:
+                        mtf_text += f"Signal: {d['crossover']} | "
+                    if 'rsi' in d:
+                        mtf_text += f"RSI: {d['rsi']} | "
+                    if 'vol_spike' in d:
+                        mtf_text += f"Vol: {'SPIKE' if d['vol_spike'] else 'Normal'} | "
+                    if 'support' in d and 'resistance' in d:
+                        mtf_text += f"S/R: {d['support']:.4f}/{d['resistance']:.4f}"
+                    mtf_text += "\n"
 
-        # === TREND ALIGNMENT ===
-        h1_trend = mtf.get('1h', {}).get('trend')
-        h4_trend = mtf.get('4h', {}).get('trend')
-        alignment = "STRONG" if h1_trend == h4_trend and h1_trend else "WEAK"
+            # === TREND ALIGNMENT ===
+            h1_trend = mtf.get('1h', {}).get('trend')
+            h4_trend = mtf.get('4h', {}).get('trend')
+            alignment = "STRONG" if h1_trend == h4_trend and h1_trend else "WEAK"
 
-        # === REVERSE ANALYSIS ===
-        reverse_analysis = ""
-        if current_trade and self.allow_reverse_positions:
-            pnl = self.calculate_current_pnl(current_trade, current_price)
-            reverse_analysis = f"""
-            EXISTING POSITION:
-            - Direction: {current_trade['direction']}
-            - Entry: ${current_trade['entry_price']:.4f}
-            - PnL: {pnl:.2f}%
-            - REVERSE if trend flipped?
-            """
+            # === REVERSE ANALYSIS ===
+            reverse_analysis = ""
+            if current_trade and self.allow_reverse_positions:
+                pnl = self.calculate_current_pnl(current_trade, current_price)
+                reverse_analysis = f"""
+                EXISTING POSITION:
+                - Direction: {current_trade['direction']}
+                - Entry: ${current_trade['entry_price']:.4f}
+                - PnL: {pnl:.2f}%
+                - REVERSE if trend flipped?
+                """
 
-        # === LEARNING CONTEXT ===
-        learning_context = ""
-        if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'get_learning_enhanced_prompt'):
-            learning_context = self.get_learning_enhanced_prompt(pair, market_data)
+            # === LEARNING CONTEXT ===
+            learning_context = ""
+            if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'get_learning_enhanced_prompt'):
+                learning_context = self.get_learning_enhanced_prompt(pair, market_data)
 
         # === FINAL PROMPT ===
         prompt = f"""
