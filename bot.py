@@ -305,129 +305,128 @@ def get_market_news_sentiment(self):
     except:
         return "General crypto market news monitoring"
 
-            def get_ai_trading_decision(self, pair, market_data, current_trade=None):
-        """AI makes COMPLETE trading decisions including REVERSE positions"""
-        try:
-            if not self.openrouter_key:
-                return self.get_fallback_decision(pair, market_data)
+def get_ai_trading_decision(self, pair, market_data, current_trade=None):
+    """AI makes COMPLETE trading decisions including REVERSE positions"""
+    try:
+        if not self.openrouter_key:
+            return self.get_fallback_decision(pair, market_data)
+        
+        current_price = market_data.get('current_price', 0)
+        mtf = market_data.get('mtf_analysis', {})
 
-            current_price = market_data.get('current_price', 0)
-            mtf = market_data.get('mtf_analysis', {})
+        # === MULTI-TIMEFRAME TEXT SUMMARY ===
+        mtf_text = "MULTI-TIMEFRAME ANALYSIS:\n"
+        for tf in ['5m', '15m', '1h', '4h', '1d']:
+            if tf in mtf:
+                d = mtf[tf]
+                mtf_text += f"- {tf.upper()}: {d.get('trend', 'N/A')} | "
+                if 'crossover' in d:
+                    mtf_text += f"Signal: {d['crossover']} | "
+                if 'rsi' in d:
+                    mtf_text += f"RSI: {d['rsi']} | "
+                if 'vol_spike' in d:
+                    mtf_text += f"Vol: {'SPIKE' if d['vol_spike'] else 'Normal'} | "
+                if 'support' in d and 'resistance' in d:
+                    mtf_text += f"S/R: {d['support']:.4f}/{d['resistance']:.4f}"
+                mtf_text += "\n"
 
-            # === MULTI-TIMEFRAME TEXT SUMMARY ===
-            mtf_text = "MULTI-TIMEFRAME ANALYSIS:\n"
-            for tf in ['5m', '15m', '1h', '4h', '1d']:
-                if tf in mtf:
-                    d = mtf[tf]
-                    mtf_text += f"- {tf.upper()}: {d.get('trend', 'N/A')} | "
-                    if 'crossover' in d:
-                        mtf_text += f"Signal: {d['crossover']} | "
-                    if 'rsi' in d:
-                        mtf_text += f"RSI: {d['rsi']} | "
-                    if 'vol_spike' in d:
-                        mtf_text += f"Vol: {'SPIKE' if d['vol_spike'] else 'Normal'} | "
-                    if 'support' in d and 'resistance' in d:
-                        mtf_text += f"S/R: {d['support']:.4f}/{d['resistance']:.4f}"
-                    mtf_text += "\n"
+        # === TREND ALIGNMENT ===
+        h1_trend = mtf.get('1h', {}).get('trend')
+        h4_trend = mtf.get('4h', {}).get('trend')
+        alignment = "STRONG" if h1_trend == h4_trend and h1_trend else "WEAK"
 
-            # === TREND ALIGNMENT ===
-            h1_trend = mtf.get('1h', {}).get('trend')
-            h4_trend = mtf.get('4h', {}).get('trend')
-            alignment = "STRONG" if h1_trend == h4_trend and h1_trend else "WEAK"
-
-            # === REVERSE ANALYSIS ===
-            reverse_analysis = ""
-            if current_trade and self.allow_reverse_positions:
-                pnl = self.calculate_current_pnl(current_trade, current_price)
-                reverse_analysis = f"""
-                EXISTING POSITION:
-                - Direction: {current_trade['direction']}
-                - Entry: ${current_trade['entry_price']:.4f}
-                - PnL: {pnl:.2f}%
-                - REVERSE if trend flipped?
-                """
-
-            # === LEARNING CONTEXT ===
-            learning_context = ""
-            if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'get_learning_enhanced_prompt'):
-                learning_context = self.get_learning_enhanced_prompt(pair, market_data)
-
-            # === FINAL PROMPT ===
-            prompt = f"""
-            YOU ARE A PROFESSIONAL AI TRADER. Budget: ${self.available_budget:.2f}
-
-            {mtf_text}
-            TREND ALIGNMENT: {alignment}
-
-            1H TRADING PAIR: {pair}
-            Current Price: ${current_price:.6f}
-            {reverse_analysis}
-            {learning_context}
-
-            RULES:
-            - Only trade if 1H and 4H trend align
-            - Confirm entry with 15m crossover + volume spike
-            - RSI < 30 = oversold, > 70 = overbought
-            - Position size: 5-10% of budget ($50 min)
-            - Leverage: 5-10x based on volatility
-            - NO TP/SL - you will close manually
-
-            REVERSE POSITION STRATEGY (CRITICAL):
-            - Use "REVERSE_LONG"  → Close current SHORT + Open LONG immediately
-            - Use "REVERSE_SHORT" → Close current LONG  + Open SHORT immediately
-            - REVERSE only if ALL conditions met:
-              1. Current PnL ≤ -2%
-              2. 1H and 4H trend flipped (opposite to current position)
-              3. 15m shows crossover in new direction
-              4. Volume spike confirms momentum
-            - Example:
-              • You have SHORT @ $100 → Price now $103 → PnL: -3%
-              • 4H: BEARISH → BULLISH, 15m: GOLDEN cross, Volume: SPIKE
-              → Return "REVERSE_LONG"
-
-            Return JSON:
-            {{
-                "decision": "LONG" | "SHORT" | "HOLD" | "REVERSE_LONG" | "REVERSE_SHORT",
-                "position_size_usd": number,
-                "entry_price": number,
-                "leverage": number,
-                "confidence": 0-100,
-                "reasoning": "MTF alignment + signal + risk"
-            }}
+        # === REVERSE ANALYSIS ===
+        reverse_analysis = ""
+        if current_trade and self.allow_reverse_positions:
+            pnl = self.calculate_current_pnl(current_trade, current_price)
+            reverse_analysis = f"""
+            EXISTING POSITION:
+            - Direction: {current_trade['direction']}
+            - Entry: ${current_trade['entry_price']:.4f}
+            - PnL: {pnl:.2f}%
+            - REVERSE if trend flipped?
             """
 
-            headers = {
-                "Authorization": f"Bearer {self.openrouter_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com",
-                "X-Title": "Fully Autonomous AI Trader"
-            }
+        # === LEARNING CONTEXT ===
+        learning_context = ""
+        if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'get_learning_enhanced_prompt'):
+            learning_context = self.get_learning_enhanced_prompt(pair, market_data)
 
-            data = {
-                "model": "deepseek/deepseek-chat-v3.1",
-                "messages": [
-                    {"role": "system", "content": "You are a fully autonomous AI trader with reverse position capability. You manually close positions based on market conditions - no TP/SL orders are set. Analyze when to enter AND when to exit based on technical analysis. Monitor every 3 minute."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.3,
-                "max_tokens": 800
-            }
+        # === FINAL PROMPT ===
+        prompt = f"""
+YOU ARE A PROFESSIONAL AI TRADER. Budget: ${self.available_budget:.2f}
 
-            self.print_color(f"DeepSeek Analyzing {pair} with 3MIN monitoring...", self.Fore.MAGENTA + self.Style.BRIGHT)
-            response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=60)
+{mtf_text}
+TREND ALIGNMENT: {alignment}
 
-            if response.status_code == 200:
-                result = response.json()
-                ai_response = result['choices'][0]['message']['content'].strip()
-                return self.parse_ai_trading_decision(ai_response, pair, current_price, current_trade)
-            else:
-                self.print_color(f"DeepSeek API error: {response.status_code}", self.Fore.RED)
-                return self.get_fallback_decision(pair, market_data)
+1H TRADING PAIR: {pair}
+Current Price: ${current_price:.6f}
+{reverse_analysis}
+{learning_context}
 
-        except Exception as e:
-            self.print_color(f"DeepSeek analysis failed: {e}", self.Fore.RED)
+RULES:
+- Only trade if 1H and 4H trend align
+- Confirm entry with 15m crossover + volume spike
+- RSI < 30 = oversold, > 70 = overbought
+- Position size: 5-10% of budget ($50 min)
+- Leverage: 5-10x based on volatility
+- NO TP/SL - you will close manually
+
+REVERSE POSITION STRATEGY (CRITICAL):
+- Use "REVERSE_LONG"  → Close current SHORT + Open LONG immediately
+- Use "REVERSE_SHORT" → Close current LONG  + Open SHORT immediately
+- REVERSE only if ALL conditions met:
+  1. Current PnL ≤ -2%
+  2. 1H and 4H trend flipped (opposite to current position)
+  3. 15m shows crossover in new direction
+  4. Volume spike confirms momentum
+- Example:
+  • You have SHORT @ $100 → Price now $103 → PnL: -3%
+  • 4H: BEARISH → BULLISH, 15m: GOLDEN cross, Volume: SPIKE
+  → Return "REVERSE_LONG"
+
+Return JSON:
+{{
+    "decision": "LONG" | "SHORT" | "HOLD" | "REVERSE_LONG" | "REVERSE_SHORT",
+    "position_size_usd": number,
+    "entry_price": number,
+    "leverage": number,
+    "confidence": 0-100,
+    "reasoning": "MTF alignment + signal + risk"
+}}
+"""
+        headers = {
+            "Authorization": f"Bearer {self.openrouter_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com",
+            "X-Title": "Fully Autonomous AI Trader"
+        }
+        
+        data = {
+            "model": "deepseek/deepseek-chat-v3.1",
+            "messages": [
+                {"role": "system", "content": "You are a fully autonomous AI trader with reverse position capability. You manually close positions based on market conditions - no TP/SL orders are set. Analyze when to enter AND when to exit based on technical analysis. Monitor every 3 minute."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.3,
+            "max_tokens": 800
+        }
+        
+        self.print_color(f"🧠 DeepSeek Analyzing {pair} with 3MIN monitoring...", self.Fore.MAGENTA + self.Style.BRIGHT)
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=60)
+        
+        if response.status_code == 200:
+            result = response.json()
+            ai_response = result['choices'][0]['message']['content'].strip()
+            return self.parse_ai_trading_decision(ai_response, pair, current_price, current_trade)
+        else:
+            self.print_color(f"DeepSeek API error: {response.status_code}", self.Fore.RED)
             return self.get_fallback_decision(pair, market_data)
             
+    except Exception as e:
+        self.print_color(f"DeepSeek analysis failed: {e}", self.Fore.RED)
+        return self.get_fallback_decision(pair, market_data)
+
 def parse_ai_trading_decision(self, ai_response, pair, current_price, current_trade=None):
     """Parse AI's trading decision including REVERSE positions"""
     try:
@@ -1035,17 +1034,17 @@ def display_dashboard(self):
     self.print_color("=" * 90, self.Fore.CYAN)
     self.print_color(f"🎯 MODE: NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
     self.print_color(f"⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
-
-            # === MTF SUMMARY ===
-        if hasattr(self, 'last_mtf') and self.last_mtf:
-            self.print_color(" MULTI-TIMEFRAME SUMMARY", self.Fore.MAGENTA + self.Style.BRIGHT)
-            for tf, data in self.last_mtf.items():
-                color = self.Fore.GREEN if data.get('trend') == 'BULLISH' else self.Fore.RED
-                signal = f" | {data.get('crossover', '')}" if 'crossover' in data else ""
-                rsi_text = f" | RSI: {data.get('rsi', 50)}" if 'rsi' in data else ""
-                vol_text = f" | Vol: {'SPIKE' if data.get('vol_spike') else 'Normal'}" if 'vol_spike' in data else ""
-                self.print_color(f"  {tf.upper()}: {data.get('trend', 'N/A')}{signal}{rsi_text}{vol_text}", color)
-            self.print_color("   " + "-" * 60, self.Fore.CYAN)
+    
+    # === MTF SUMMARY ===
+    if hasattr(self, 'last_mtf') and self.last_mtf:
+        self.print_color(" MULTI-TIMEFRAME SUMMARY", self.Fore.MAGENTA + self.Style.BRIGHT)
+        for tf, data in self.last_mtf.items():
+            color = self.Fore.GREEN if data.get('trend') == 'BULLISH' else self.Fore.RED
+            signal = f" | {data.get('crossover', '')}" if 'crossover' in data else ""
+            rsi_text = f" | RSI: {data.get('rsi', 50)}" if 'rsi' in data else ""
+            vol_text = f" | Vol: {'SPIKE' if data.get('vol_spike') else 'Normal'}" if 'vol_spike' in data else ""
+            self.print_color(f"  {tf.upper()}: {data.get('trend', 'N/A')}{signal}{rsi_text}{vol_text}", color)
+        self.print_color("   " + "-" * 60, self.Fore.CYAN)
     
     # 🧠 Add learning stats
     if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'mistakes_history'):
