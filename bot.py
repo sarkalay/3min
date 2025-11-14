@@ -27,31 +27,6 @@ from datetime import datetime, timedelta
 import pytz
 import pandas as pd
 
-# === MULTI-TIMEFRAME INDICATORS ===
-def calculate_ema(self, data, period):
-    if len(data) < period:
-        return [None] * len(data)
-    df = pd.Series(data)
-    return df.ewm(span=period, adjust=False).mean().tolist()
-
-def calculate_rsi(self, data, period=14):
-    if len(data) < period + 1:
-        return [50] * len(data)
-    df = pd.Series(data)
-    delta = df.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-    rs = gain / loss
-    rsi = 100 - (100 / (1 + rs))
-    return rsi.fillna(50).tolist()
-
-def calculate_volume_spike(self, volumes, window=10):
-    if len(volumes) < window + 1:
-        return False
-    avg_vol = np.mean(volumes[-window-1:-1])
-    current_vol = volumes[-1]
-    return current_vol > avg_vol * 1.8
-
 # Colorama setup
 try:
     from colorama import init, Fore, Back, Style
@@ -96,6 +71,34 @@ else:
                 'improvement_areas': []
             }
             self._initialize_trading()
+
+# === MULTI-TIMEFRAME INDICATORS ===
+def calculate_ema(self, data, period):
+    """Calculate Exponential Moving Average"""
+    if len(data) < period:
+        return [None] * len(data)
+    df = pd.Series(data)
+    return df.ewm(span=period, adjust=False).mean().tolist()
+
+def calculate_rsi(self, data, period=14):
+    """Calculate Relative Strength Index"""
+    if len(data) < period + 1:
+        return [50] * len(data)
+    df = pd.Series(data)
+    delta = df.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi.fillna(50).tolist()
+
+def calculate_volume_spike(self, volumes, window=10):
+    """Calculate if current volume is a spike"""
+    if len(volumes) < window + 1:
+        return False
+    avg_vol = np.mean(volumes[-window-1:-1])
+    current_vol = volumes[-1]
+    return current_vol > avg_vol * 1.8
 
 # Common trading initialization for both cases
 def _initialize_trading(self):
@@ -1196,7 +1199,7 @@ def start_trading(self):
             self.print_color(f"Main loop error: {e}", self.Fore.RED)
             time.sleep(self.monitoring_interval)
 
-# Add all methods to the class
+# Add all methods to the class including MTF indicators
 methods = [
     load_real_trade_history, save_real_trade_history, add_trade_to_history,
     get_thailand_time, print_color, validate_config, setup_futures,
@@ -1206,7 +1209,9 @@ methods = [
     get_current_price, calculate_quantity, can_open_new_position,
     get_ai_decision_with_learning, execute_ai_trade, get_ai_close_decision,
     monitor_positions, display_dashboard, show_trade_history, show_trading_stats,
-    run_trading_cycle, start_trading
+    run_trading_cycle, start_trading,
+    # Add MTF indicator methods
+    calculate_ema, calculate_rsi, calculate_volume_spike, _get_mock_mtf_data
 ]
 
 for method in methods:
