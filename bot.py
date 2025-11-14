@@ -25,6 +25,32 @@ from binance.exceptions import BinanceAPIException
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import pytz
+import pandas as pd
+
+# === MULTI-TIMEFRAME INDICATORS ===
+def calculate_ema(self, data, period):
+    if len(data) < period:
+        return [None] * len(data)
+    df = pd.Series(data)
+    return df.ewm(span=period, adjust=False).mean().tolist()
+
+def calculate_rsi(self, data, period=14):
+    if len(data) < period + 1:
+        return [50] * len(data)
+    df = pd.Series(data)
+    delta = df.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi.fillna(50).tolist()
+
+def calculate_volume_spike(self, volumes, window=10):
+    if len(volumes) < window + 1:
+        return False
+    avg_vol = np.mean(volumes[-window-1:-1])
+    current_vol = volumes[-1]
+    return current_vol > avg_vol * 1.8
 
 # Colorama setup
 try:
@@ -285,66 +311,89 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
         if not self.openrouter_key:
             return self.get_fallback_decision(pair, market_data)
         
-        current_price = market_data['current_price']
-        
-        # NEW: Check if we have existing trade for reverse position analysis
+                current_price = market_data['current_price']
+        mtf = market_data.get('mtf_analysis', {})
+
+        # === MULTI-TIMEFRAME TEXT SUMMARY ===
+        mtf_text = "MULTI-TIMEFRAME ANALYSIS:\n"
+        for tf in ['5m', '15m', '1h', '4h', '1d']:
+            if tf in mtf:
+                d = mtf[tf]
+                mtf_text += f"- {tf.upper()}: {d.get('trend', 'N/A')} | "
+                if 'crossover' in d:
+                    mtf_text += f"Signal: {d['crossover']} | "
+                if 'rsi' in d:
+                    mtf_text += f"RSI: {d['rsi']} | "
+                if 'vol_spike' in d:
+                    mtf_text += f"Vol: {'SPIKE' if d['vol_spike'] else 'Normal'} | "
+                if 'support' in d and 'resistance' in d:
+                    mtf_text += f"S/R: {d['support']:.4f}/{d['resistance']:.4f}"
+                mtf_text += "\n"
+
+        # === TREND ALIGNMENT ===
+        h1_trend = mtf.get('1h', {}).get('trend')
+        h4_trend = mtf.get('4h', {}).get('trend')
+        alignment = "STRONG" if h1_trend == h4_trend and h1_trend else "WEAK"
+
+        # === REVERSE ANALYSIS ===
         reverse_analysis = ""
         if current_trade and self.allow_reverse_positions:
-            current_pnl = self.calculate_current_pnl(current_trade, current_price)
+            pnl = self.calculate_current_pnl(current_trade, current_price)
             reverse_analysis = f"""
-            EXISTING POSITION ANALYSIS:
-            - Current Position: {current_trade['direction']}
-            - Entry Price: ${current_trade['entry_price']}
-            - Current PnL: {current_pnl:.2f}%
-            - Should we REVERSE this position?
+            EXISTING POSITION:
+            - Direction: {current_trade['direction']}
+            - Entry: ${current_trade['entry_price']:.4f}
+            - PnL: {pnl:.2f}%
+            - REVERSE if trend flipped?
             """
-        
-        # 🧠 Add learning context to prompt
+
+        # === LEARNING CONTEXT ===
         learning_context = ""
         if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'get_learning_enhanced_prompt'):
             learning_context = self.get_learning_enhanced_prompt(pair, market_data)
-        
-        # 🧠 COMPREHENSIVE AI TRADING PROMPT WITH REVERSE FEATURE
-        prompt = f"""
-        YOU ARE A FULLY AUTONOMOUS AI TRADER with ${self.available_budget:.2f} budget.
-        RISK MANAGEMENT GUIDELINES:
-        - Total Budget: ${self.total_budget}
-        - Available Budget: ${self.available_budget:.2f}
-        - Recommended Position Size: 10-25% of available budget (${self.available_budget * 0.1:.2f} - ${self.available_budget * 0.25:.2f})
-        - Maximum Position: ${self.total_budget * self.max_position_size_percent / 100:.2f} (25% of total budget)
-        - Minimum Position: $25 (to avoid micro positions)
-        - Use leverage 5-10x appropriately based on market volatility
 
+        # === FINAL PROMPT ===
+        prompt = f"""
+        YOU ARE A PROFESSIONAL AI TRADER. Budget: ${self.available_budget:.2f}
+
+        {mtf_text}
+        TREND ALIGNMENT: {alignment}
+
+        1H TRADING PAIR: {pair}
+        Current Price: ${current_price:.6f}
+        {reverse_analysis}
         {learning_context}
 
-        MARKET ANALYSIS FOR {pair} (3MINUTE MONITORING):
-        - Current Price: ${current_price:.6f}
-        - 1Hour Price Change: {market_data.get('price_change', 0):.2f}%
-        - Support/Resistance Levels: {market_data.get('support_levels', [])} / {market_data.get('resistance_levels', [])}
-        {reverse_analysis}
+        RULES:
+        - Only trade if 1H and 4H trend align
+        - Confirm entry with 15m crossover + volume spike
+        - RSI < 30 = oversold, > 70 = overbought
+        - Position size: 5-10% of budget ($50 min)
+        - Leverage: 5-10x based on volatility
+        - NO TP/SL - you will close manually
 
-        IMPORTANT: NO TP/SL ORDERS WILL BE SET!
-        - You must manually monitor and close positions
-        - Consider market conditions for entry AND exit
-        - Close positions based on trend changes, not fixed levels
+        REVERSE POSITION STRATEGY (CRITICAL):
+        - Use "REVERSE_LONG"  → Close current SHORT + Open LONG immediately
+        - Use "REVERSE_SHORT" → Close current LONG  + Open SHORT immediately
+        - REVERSE only if ALL conditions met:
+          1. Current PnL ≤ -2%
+          2. 1H and 4H trend flipped (opposite to current position)
+          3. 15m shows crossover in new direction
+          4. Volume spike confirms momentum
+        - Example:
+          • You have SHORT @ $100 → Price now $103 → PnL: -3%
+          • 4H: BEARISH → BULLISH, 15m: GOLDEN cross, Volume: SPIKE
+          → Return "REVERSE_LONG"
 
-        REVERSE POSITION STRATEGY:
-        - If existing position is losing and market trend reversed, consider REVERSE
-        - Close current position and open opposite direction immediately
-
-        Return VALID JSON only:
+        Return JSON:
         {{
             "decision": "LONG" | "SHORT" | "HOLD" | "REVERSE_LONG" | "REVERSE_SHORT",
             "position_size_usd": number,
             "entry_price": number,
-            "leverage": number (5-10),
+            "leverage": number,
             "confidence": 0-100,
-            "reasoning": "analysis including when to manually close based on market conditions"
+            "reasoning": "MTF alignment + signal + risk"
         }}
-
-        REVERSE Decisions meaning:
-        - "REVERSE_LONG": Close SHORT position (if any), open LONG immediately  
-        - "REVERSE_SHORT": Close LONG position (if any), open SHORT immediately
         """
 
         headers = {
@@ -591,58 +640,93 @@ def close_trade_immediately(self, pair, trade, reason="REVERSE"):
         self.print_color(f"❌ Immediate close failed: {e}", self.Fore.RED)
         return False
 
-def get_price_history(self, pair, limit=12):
-    """Get 1hour price history with technical levels"""
+def get_price_history(self, pair, limit=50):
+    """Multi-Timeframe Analysis with EMA, RSI, Volume"""
     try:
-        if self.binance:
-            klines = self.binance.futures_klines(symbol=pair, interval=Client.KLINE_INTERVAL_1HOUR, limit=limit)
-            prices = [float(k[4]) for k in klines]
+        if not self.binance:
+            return self._get_mock_mtf_data(pair)
+
+        intervals = {
+            '5m': (Client.KLINE_INTERVAL_5MINUTE, 50),
+            '15m': (Client.KLINE_INTERVAL_15MINUTE, 50),
+            '1h': (Client.KLINE_INTERVAL_1HOUR, 50),
+            '4h': (Client.KLINE_INTERVAL_4HOUR, 30),
+            '1d': (Client.KLINE_INTERVAL_1DAY, 30)
+        }
+
+        mtf = {}
+        current_price = self.get_current_price(pair)
+
+        for name, (interval, lim) in intervals.items():
+            klines = self.binance.futures_klines(symbol=pair, interval=interval, limit=lim)
+            if not klines:
+                continue
+
+            closes = [float(k[4]) for k in klines]
             highs = [float(k[2]) for k in klines]
             lows = [float(k[3]) for k in klines]
             volumes = [float(k[5]) for k in klines]
-            
-            current_price = prices[-1] if prices else 0
-            # Calculate 4-hour price change for 1hr context
-            price_change = ((current_price - prices[-4]) / prices[-4] * 100) if len(prices) >= 4 else 0
-            volume_change = ((volumes[-1] - volumes[-4]) / volumes[-4] * 100) if len(volumes) >= 4 else 0
-            
-            # Calculate support/resistance levels for 1hr
-            support_levels = [min(lows[-6:]), min(lows[-12:])]
-            resistance_levels = [max(highs[-6:]), max(highs[-12:])]
-            
-            return {
-                'prices': prices,
-                'highs': highs,
-                'lows': lows,
-                'volumes': volumes,
-                'current_price': current_price,
-                'price_change': price_change,
-                'volume_change': volume_change,
-                'support_levels': [round(l, 4) for l in support_levels],
-                'resistance_levels': [round(l, 4) for l in resistance_levels]
+
+            ema9 = self.calculate_ema(closes, 9)
+            ema21 = self.calculate_ema(closes, 21)
+            rsi = self.calculate_rsi(closes, 14)[-1] if len(closes) > 14 else 50
+
+            crossover = 'NONE'
+            if len(ema9) >= 2 and len(ema21) >= 2:
+                if ema9[-2] < ema21[-2] and ema9[-1] > ema21[-1]:
+                    crossover = 'GOLDEN'
+                elif ema9[-2] > ema21[-2] and ema9[-1] < ema21[-1]:
+                    crossover = 'DEATH'
+
+            vol_spike = self.calculate_volume_spike(volumes)
+
+            mtf[name] = {
+                'current_price': closes[-1],
+                'change_1h': ((closes[-1] - closes[-2]) / closes[-2] * 100) if len(closes) > 1 else 0,
+                'ema9': round(ema9[-1], 6) if ema9[-1] else 0,
+                'ema21': round(ema21[-1], 6) if ema21[-1] else 0,
+                'trend': 'BULLISH' if ema9[-1] > ema21[-1] else 'BEARISH',
+                'crossover': crossover,
+                'rsi': round(rsi, 1),
+                'vol_spike': vol_spike,
+                'support': round(min(lows[-10:]), 6),
+                'resistance': round(max(highs[-10:]), 6)
             }
-        else:
-            current_price = self.get_current_price(pair)
-            return {
-                'prices': [current_price] * 12,
-                'highs': [current_price * 1.03] * 12,
-                'lows': [current_price * 0.97] * 12,
-                'volumes': [100000] * 12,
-                'current_price': current_price,
-                'price_change': 1.2,
-                'volume_change': 15.5,
-                'support_levels': [current_price * 0.97, current_price * 0.95],
-                'resistance_levels': [current_price * 1.03, current_price * 1.05]
-            }
-    except Exception as e:
-        current_price = self.get_current_price(pair)
+
+        main = mtf.get('1h', {})
         return {
             'current_price': current_price,
-            'price_change': 0,
-            'volume_change': 0,
-            'support_levels': [],
-            'resistance_levels': []
+            'price_change': main.get('change_1h', 0),
+            'support_levels': [mtf['1h']['support'], mtf['4h']['support']] if '4h' in mtf else [],
+            'resistance_levels': [mtf['1h']['resistance'], mtf['4h']['resistance']] if '4h' in mtf else [],
+            'mtf_analysis': mtf
         }
+
+    except Exception as e:
+        self.print_color(f"MTF Analysis error: {e}", self.Fore.RED)
+        return {
+            'current_price': self.get_current_price(pair),
+            'price_change': 0,
+            'support_levels': [],
+            'resistance_levels': [],
+            'mtf_analysis': {}
+        }
+
+def _get_mock_mtf_data(self, pair):
+    price = self.get_current_price(pair)
+    return {
+        'current_price': price,
+        'price_change': 1.2,
+        'support_levels': [price * 0.97, price * 0.95],
+        'resistance_levels': [price * 1.03, price * 1.05],
+        'mtf_analysis': {
+            '5m': {'trend': 'BULLISH', 'crossover': 'GOLDEN', 'rsi': 68, 'vol_spike': True},
+            '15m': {'trend': 'BULLISH', 'crossover': 'NONE', 'rsi': 62},
+            '1h': {'trend': 'BULLISH', 'ema9': price*1.01, 'ema21': price*1.00},
+            '4h': {'trend': 'BULLISH'},
+            '1d': {'support': price*0.92, 'resistance': price*1.08}
+        }
+    }
 
 def get_current_price(self, pair):
     try:
