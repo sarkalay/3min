@@ -308,10 +308,10 @@ def get_market_news_sentiment(self):
 def get_ai_trading_decision(self, pair, market_data, current_trade=None):
     """AI makes COMPLETE trading decisions including REVERSE positions"""
     try:
-        if not self.openrouter_key:
+                if not self.openrouter_key:
             return self.get_fallback_decision(pair, market_data)
-        
-                current_price = market_data['current_price']
+
+        current_price = market_data.get('current_price', 0)
         mtf = market_data.get('mtf_analysis', {})
 
         # === MULTI-TIMEFRAME TEXT SUMMARY ===
@@ -1035,6 +1035,17 @@ def display_dashboard(self):
     self.print_color("=" * 90, self.Fore.CYAN)
     self.print_color(f"🎯 MODE: NO TP/SL - AI MANUAL CLOSE ONLY", self.Fore.YELLOW + self.Style.BRIGHT)
     self.print_color(f"⏰ MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
+
+            # === MTF SUMMARY ===
+        if hasattr(self, 'last_mtf') and self.last_mtf:
+            self.print_color(" MULTI-TIMEFRAME SUMMARY", self.Fore.MAGENTA + self.Style.BRIGHT)
+            for tf, data in self.last_mtf.items():
+                color = self.Fore.GREEN if data.get('trend') == 'BULLISH' else self.Fore.RED
+                signal = f" | {data.get('crossover', '')}" if 'crossover' in data else ""
+                rsi_text = f" | RSI: {data.get('rsi', 50)}" if 'rsi' in data else ""
+                vol_text = f" | Vol: {'SPIKE' if data.get('vol_spike') else 'Normal'}" if 'vol_spike' in data else ""
+                self.print_color(f"  {tf.upper()}: {data.get('trend', 'N/A')}{signal}{rsi_text}{vol_text}", color)
+            self.print_color("   " + "-" * 60, self.Fore.CYAN)
     
     # 🧠 Add learning stats
     if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'mistakes_history'):
@@ -1131,6 +1142,7 @@ def run_trading_cycle(self):
         for pair in self.available_pairs:
             if self.available_budget > 100:
                 market_data = self.get_price_history(pair)
+                self.last_mtf = market_data.get('mtf_analysis', {})
                 
                 # Use learning-enhanced AI decision
                 ai_decision = self.get_ai_decision_with_learning(pair, market_data)
