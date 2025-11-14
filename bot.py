@@ -308,8 +308,8 @@ def get_market_news_sentiment(self):
 def get_ai_trading_decision(self, pair, market_data, current_trade=None):
     """AI makes COMPLETE trading decisions including REVERSE positions"""
     try:
-        if not self.openrouter_key:
-        return self.get_fallback_decision(pair, market_data)
+           if not self.openrouter_key:
+           return self.get_fallback_decision(pair, market_data)
 
         current_price = market_data.get('current_price', 0)
         mtf = market_data.get('mtf_analysis', {})
