@@ -305,7 +305,7 @@ def get_market_news_sentiment(self):
     except:
         return "General crypto market news monitoring"
 
-        def get_ai_trading_decision(self, pair, market_data, current_trade=None):
+            def get_ai_trading_decision(self, pair, market_data, current_trade=None):
         """AI makes COMPLETE trading decisions including REVERSE positions"""
         try:
             if not self.openrouter_key:
@@ -427,7 +427,7 @@ def get_market_news_sentiment(self):
         except Exception as e:
             self.print_color(f"DeepSeek analysis failed: {e}", self.Fore.RED)
             return self.get_fallback_decision(pair, market_data)
-
+            
 def parse_ai_trading_decision(self, ai_response, pair, current_price, current_trade=None):
     """Parse AI's trading decision including REVERSE positions"""
     try:
