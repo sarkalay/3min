@@ -311,8 +311,8 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
             if not self.openrouter_key:
                 return self.get_fallback_decision(pair, market_data)
 
-        current_price = market_data.get('current_price', 0)
-        mtf = market_data.get('mtf_analysis', {})
+            current_price = market_data.get('current_price', 0)
+            mtf = market_data.get('mtf_analysis', {})
 
         # === MULTI-TIMEFRAME TEXT SUMMARY ===
         mtf_text = "MULTI-TIMEFRAME ANALYSIS:\n"
