@@ -353,7 +353,7 @@ def get_market_news_sentiment(self):
                 learning_context = self.get_learning_enhanced_prompt(pair, market_data)
 
         # === FINAL PROMPT ===
-                prompt = f"""
+            prompt = f"""
         YOU ARE A PROFESSIONAL AI TRADER. Budget: ${self.available_budget:.2f}
 
         {mtf_text}
