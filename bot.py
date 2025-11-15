@@ -1720,27 +1720,6 @@ def run_paper_trading_cycle(self):
                 self.real_bot.print_color(f"PAPER: Main loop error: {e}", self.Fore.RED)
                 time.sleep(self.monitoring_interval)
 
-# Add paper trading methods to the class
-paper_methods = [
-    FullyAutonomous1HourPaperTrader.load_paper_history,
-    FullyAutonomous1HourPaperTrader.save_paper_history,
-    FullyAutonomous1HourPaperTrader.add_paper_trade_to_history,
-    FullyAutonomous1HourPaperTrader.calculate_current_pnl,
-    FullyAutonomous1HourPaperTrader.paper_execute_reverse_position,
-    FullyAutonomous1HourPaperTrader.paper_close_trade_immediately,
-    FullyAutonomous1HourPaperTrader.get_ai_close_decision,
-    FullyAutonomous1HourPaperTrader.paper_execute_trade,
-    FullyAutonomous1HourPaperTrader.monitor_paper_positions,
-    FullyAutonomous1HourPaperTrader.display_paper_dashboard,
-    FullyAutonomous1HourPaperTrader.show_paper_history,
-    FullyAutonomous1HourPaperTrader.show_paper_stats,
-    FullyAutonomous1HourPaperTrader.run_paper_trading_cycle,
-    FullyAutonomous1HourPaperTrader.start_paper_trading
-]
-
-for method in paper_methods:
-    setattr(FullyAutonomous1HourPaperTrader, method.__name__, method)
-
 # Main execution
 if __name__ == "__main__":
     try:
