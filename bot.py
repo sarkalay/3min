@@ -1130,12 +1130,12 @@ def run_trading_cycle(self):
         self.display_dashboard()
         
         # Show stats periodically
-        if hasattr(self, 'cycle_count') and self.cycle_count % 5 == 0:  # Every 5 cycles (5 minutes)
+        if hasattr(self, 'cycle_count') and self.cycle_count % 4 == 0:  # Every 4 cycles (5 minutes)
             self.show_trade_history(8)
             self.show_trading_stats()
         
         # 🧠 Show advanced learning progress every 10 cycles
-        if self.cycle_count % 10 == 0 and LEARN_SCRIPT_AVAILABLE:
+        if self.cycle_count % 3 == 0 and LEARN_SCRIPT_AVAILABLE:
             self.show_advanced_learning_progress()
         
         self.print_color(f"\n🔍 DEEPSEEK SCANNING {len(self.available_pairs)} PAIRS...", self.Fore.BLUE + self.Style.BRIGHT)
