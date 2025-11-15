@@ -1122,6 +1122,39 @@ def show_trading_stats(self):
     self.print_color(f"Average P&L per Trade: ${avg_trade:.2f}", self.Fore.WHITE)
     self.print_color(f"Available Budget: ${self.available_budget:.2f}", self.Fore.CYAN + self.Style.BRIGHT)
 
+def show_advanced_learning_progress(self):
+    """Display learning progress every 3 cycles"""
+    if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'mistakes_history'):
+        total_lessons = len(self.mistakes_history)
+        if total_lessons > 0:
+            self.print_color(f"\n🧠 AI LEARNING PROGRESS (Cycle {getattr(self, 'cycle_count', 0)})", self.Fore.MAGENTA + self.Style.BRIGHT)
+            self.print_color("=" * 50, self.Fore.MAGENTA)
+            self.print_color(f"📚 Total Lessons Learned: {total_lessons}", self.Fore.CYAN)
+            
+            # Show recent mistakes patterns
+            recent_mistakes = self.mistakes_history[-5:] if len(self.mistakes_history) >= 5 else self.mistakes_history
+            if recent_mistakes:
+                self.print_color(f"🔄 Recent Patterns:", self.Fore.YELLOW)
+                for i, mistake in enumerate(reversed(recent_mistakes)):
+                    reason = mistake.get('reason', 'Unknown pattern')
+                    self.print_color(f"   {i+1}. {reason}", self.Fore.WHITE)
+            
+            # Show improvement stats
+            if hasattr(self, 'performance_stats'):
+                total_trades = self.performance_stats.get('total_trades', 0)
+                winning_trades = self.performance_stats.get('winning_trades', 0)
+                win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+                self.print_color(f"📈 Current Win Rate: {win_rate:.1f}%", self.Fore.GREEN)
+                
+            # Show learned patterns count
+            if hasattr(self, 'learned_patterns'):
+                pattern_count = len(self.learned_patterns)
+                self.print_color(f"🎯 Patterns Memorized: {pattern_count}", self.Fore.BLUE)
+        else:
+            self.print_color(f"\n🧠 AI is collecting learning data... (No mistakes yet)", self.Fore.YELLOW)
+    else:
+        self.print_color(f"\n🧠 Learning module not available", self.Fore.YELLOW)
+
 def run_trading_cycle(self):
     """Run trading cycle with REVERSE position checking and AI manual close"""
     try:
@@ -1134,8 +1167,8 @@ def run_trading_cycle(self):
             self.show_trade_history(8)
             self.show_trading_stats()
         
-        # 🧠 Show advanced learning progress every 10 cycles
-        if self.cycle_count % 3 == 0 and LEARN_SCRIPT_AVAILABLE:
+        # 🧠 Show advanced learning progress every 3 cycles
+        if hasattr(self, 'cycle_count') and self.cycle_count % 3 == 0 and LEARN_SCRIPT_AVAILABLE:
             self.show_advanced_learning_progress()
         
         self.print_color(f"\n🔍 DEEPSEEK SCANNING {len(self.available_pairs)} PAIRS...", self.Fore.BLUE + self.Style.BRIGHT)
@@ -1209,7 +1242,7 @@ methods = [
     get_current_price, calculate_quantity, can_open_new_position,
     get_ai_decision_with_learning, execute_ai_trade, get_ai_close_decision,
     monitor_positions, display_dashboard, show_trade_history, show_trading_stats,
-    run_trading_cycle, start_trading,
+    run_trading_cycle, start_trading, show_advanced_learning_progress,
     # Add MTF indicator methods
     calculate_ema, calculate_rsi, calculate_volume_spike, _get_mock_mtf_data
 ]
@@ -1218,7 +1251,6 @@ for method in methods:
     setattr(FullyAutonomous1HourAITrader, method.__name__, method)
 
 # Paper trading class
-# Paper trading class - ဒီ class ကိုဒီလိုပြင်ပါ
 class FullyAutonomous1HourPaperTrader:
     def __init__(self, real_bot):
         self.real_bot = real_bot
@@ -1653,6 +1685,13 @@ class FullyAutonomous1HourPaperTrader:
             # First monitor and ask AI to close paper positions
             self.monitor_paper_positions()
             self.display_paper_dashboard()
+            
+            # === FIXED: Use paper_cycle_count and check method exists ===
+            if hasattr(self, 'paper_cycle_count') and self.paper_cycle_count % 3 == 0 and LEARN_SCRIPT_AVAILABLE:
+                if hasattr(self.real_bot, 'show_advanced_learning_progress'):
+                    self.real_bot.show_advanced_learning_progress()
+                else:
+                    self.real_bot.print_color(f"\n🧠 Learning progress display not available", self.Fore.YELLOW)
             
             # Show stats periodically
             if hasattr(self, 'paper_cycle_count') and self.paper_cycle_count % 4 == 0:
