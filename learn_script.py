@@ -361,27 +361,48 @@ class SelfLearningAITrader:
             return "Learning in progress..."
 
     # ========================================
-    # 8. SHOW PROGRESS
+    # 8. SHOW PROGRESS - ALWAYS SHOW, EVEN IF NO MISTAKES
     # ========================================
     def show_advanced_learning_progress(self):
         try:
-            total = len(self.mistakes_history)
+            total_mistakes = len(self.mistakes_history)
+            total_trades = self.performance_stats.get('total_trades', 0)
+            win_rate = (self.performance_stats.get('winning_trades', 0) / max(1, total_trades)) * 100
             eff = self.performance_stats.get('learning_effectiveness', 0.5)
+
             self.print_color(f"\nADVANCED LEARNING REPORT", "CYAN")
             self.print_color("=" * 70, "CYAN")
-            self.print_color(f"Total Mistakes: {total}", "WHITE")
-            self.print_color(f"Effectiveness: {eff:.1%}", "GREEN" if eff > 0.6 else "YELLOW")
-            self.print_color(f"Threshold: {self.learning_config['confidence_threshold']:.2f}", "WHITE")
-            self.print_color(f"Patterns: {len(self.learned_patterns)}", "WHITE")
 
-            high = [(p, self.calculate_pattern_confidence(p), d['occurrences'])
-                    for p, d in self.learned_patterns.items() if self.calculate_pattern_confidence(p) > 0.5]
-            self.print_color(f"\nHIGH-CONFIDENCE PATTERNS:", "YELLOW")
-            for p, c, o in sorted(high, key=lambda x: x[1], reverse=True)[:5]:
-                self.print_color(f"  {p}: {c:.0%} ({o} times)", "WHITE")
+            # ALWAYS SHOW BASIC STATS
+            self.print_color(f"Total Trades: {total_trades}", "WHITE")
+            self.print_color(f"Win Rate: {win_rate:.1f}%", "GREEN" if win_rate > 60 else "YELLOW")
+            self.print_color(f"Total Mistakes Learned: {total_mistakes}", "WHITE")
 
-            blocked = len([m for m in self.mistakes_history if m.get('was_blocked')])
-            rate = blocked / max(1, self.performance_stats['total_trades'])
-            self.print_color(f"\nBLOCKING: {rate:.1%} of trades blocked", "MAGENTA")
+            # IF NO MISTAKES YET → SHOW OBSERVATION MODE
+            if total_mistakes == 0:
+                self.print_color("LEARNING: No mistakes yet. AI is in observation mode.", "GRAY")
+                self.print_color("Waiting for first loss to begin learning...", "YELLOW")
+                self.print_color(f"Current Effectiveness: {eff:.0%} (Neutral)", "WHITE")
+            else:
+                # FULL REPORT
+                self.print_color(f"Learning Effectiveness: {eff:.1%}", "GREEN" if eff > 0.6 else "YELLOW")
+                self.print_color(f"Confidence Threshold: {self.learning_config['confidence_threshold']:.2f}", "WHITE")
+                self.print_color(f"Active Patterns: {len(self.learned_patterns)}", "WHITE")
+
+                # HIGH CONFIDENCE PATTERNS
+                high_conf = [(p, self.calculate_pattern_confidence(p), d['occurrences'])
+                            for p, d in self.learned_patterns.items() if self.calculate_pattern_confidence(p) > 0.5]
+                if high_conf:
+                    self.print_color(f"\nHIGH-CONFIDENCE PATTERNS:", "YELLOW")
+                    for p, c, o in sorted(high_conf, key=lambda x: x[1], reverse=True)[:5]:
+                        self.print_color(f"  {p}: {c:.0%} ({o} times)", "WHITE")
+                else:
+                    self.print_color(f"\nNo high-confidence patterns yet.", "GRAY")
+
+                # BLOCKING STATS
+                blocked = len([m for m in self.mistakes_history if m.get('was_blocked')])
+                block_rate = (blocked / max(1, total_trades)) * 100
+                self.print_color(f"\nBLOCKING: {block_rate:.1f}% of trades blocked", "MAGENTA")
+
         except Exception as e:
             print(f"Progress error: {e}")
