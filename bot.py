@@ -1646,47 +1646,52 @@ class FullyAutonomous1HourPaperTrader:
         self.real_bot.print_color(f"Total Paper P&L: ${total_pnl:.2f}", self.Fore.GREEN + self.Style.BRIGHT if total_pnl > 0 else self.Fore.RED + self.Style.BRIGHT)
         self.real_bot.print_color(f"Average P&L per Paper Trade: ${avg_trade:.2f}", self.Fore.WHITE)
 
-    def run_paper_trading_cycle(self):
-        """Run paper trading cycle"""
-        try:
-            # First monitor and ask AI to close paper positions
-            self.monitor_paper_positions()
-            self.display_paper_dashboard()
-            
-            # Show stats periodically
-            if hasattr(self, 'paper_cycle_count') and self.paper_cycle_count % 5 == 0:
-                self.show_paper_history(8)
-                self.show_paper_stats()
-            
-            self.real_bot.print_color(f"\n🔍 PAPER: DEEPSEEK SCANNING {len(self.available_pairs)} PAIRS...", self.Fore.BLUE + self.Style.BRIGHT)
-            
-            qualified_signals = 0
-            for pair in self.available_pairs:
-                if self.available_budget > 100:
-                    market_data = self.real_bot.get_price_history(pair)
-                    
-                    # Use learning-enhanced AI decision for paper trading too
-                    ai_decision = self.real_bot.get_ai_decision_with_learning(pair, market_data)
-                    
-                    if ai_decision["decision"] != "HOLD" and ai_decision["position_size_usd"] > 0:
-                        qualified_signals += 1
-                        direction = ai_decision['decision']
-                        leverage_info = f"Leverage: {ai_decision['leverage']}x"
-                        
-                        if direction.startswith('REVERSE_'):
-                            self.real_bot.print_color(f"🔄 PAPER REVERSE SIGNAL: {pair} {direction} | Size: ${ai_decision['position_size_usd']:.2f}", self.Fore.YELLOW + self.Style.BRIGHT)
-                        else:
-                            self.real_bot.print_color(f"🎯 PAPER TRADE SIGNAL: {pair} {direction} | Size: ${ai_decision['position_size_usd']:.2f} | {leverage_info}", self.Fore.GREEN + self.Style.BRIGHT)
-                        
-                        success = self.paper_execute_trade(pair, ai_decision)
-                        if success:
-                            time.sleep(1)  # Short delay between paper trades
-            
-            if qualified_signals == 0:
-                self.real_bot.print_color("PAPER: No qualified DeepSeek signals this cycle", self.Fore.YELLOW)
+    # run_paper_trading_cycle ထဲ ထည့်ပေးမယ်
+def run_paper_trading_cycle(self):
+    """Run paper trading cycle"""
+    try:
+        # First monitor and ask AI to close paper positions
+        self.monitor_paper_positions()
+        self.display_paper_dashboard()
+        
+        # === LEARNING PROGRESS: EVERY 3 CYCLES ===
+        if hasattr(self.real_bot, 'cycle_count') and self.real_bot.cycle_count % 3 == 0 and LEARN_SCRIPT_AVAILABLE:
+            self.real_bot.show_advanced_learning_progress()
+        
+        # === HISTORY + STATS: EVERY 4 CYCLES ===
+        if hasattr(self.real_bot, 'cycle_count') and self.real_bot.cycle_count % 4 == 0:
+            self.show_paper_history(8)
+            self.show_paper_stats()
+        
+        self.real_bot.print_color(f"\nPAPER: DEEPSEEK SCANNING {len(self.available_pairs)} PAIRS...", self.Fore.BLUE + self.Style.BRIGHT)
+        
+        qualified_signals = 0
+        for pair in self.available_pairs:
+            if self.available_budget > 100:
+                market_data = self.real_bot.get_price_history(pair)
                 
-        except Exception as e:
-            self.real_bot.print_color(f"PAPER: Trading cycle error: {e}", self.Fore.RED)
+                # Use learning-enhanced AI decision for paper trading too
+                ai_decision = self.real_bot.get_ai_decision_with_learning(pair, market_data)
+                
+                if ai_decision["decision"] != "HOLD" and ai_decision["position_size_usd"] > 0:
+                    qualified_signals += 1
+                    direction = ai_decision['decision']
+                    leverage_info = f"Leverage: {ai_decision['leverage']}x"
+                    
+                    if direction.startswith('REVERSE_'):
+                        self.real_bot.print_color(f"PAPER REVERSE SIGNAL: {pair} {direction} | Size: ${ai_decision['position_size_usd']:.2f}", self.Fore.YELLOW + self.Style.BRIGHT)
+                    else:
+                        self.real_bot.print_color(f"PAPER TRADE SIGNAL: {pair} {direction} | Size: ${ai_decision['position_size_usd']:.2f} | {leverage_info}", self.Fore.GREEN + self.Style.BRIGHT)
+                        
+                    success = self.paper_execute_trade(pair, ai_decision)
+                    if success:
+                        time.sleep(1)
+            
+        if qualified_signals == 0:
+            self.real_bot.print_color("PAPER: No qualified DeepSeek signals this cycle", self.Fore.YELLOW)
+                
+    except Exception as e:
+        self.real_bot.print_color(f"PAPER: Trading cycle error: {e}", self.Fore.RED)
 
     def start_paper_trading(self):
         """Start paper trading"""
