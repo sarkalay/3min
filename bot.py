@@ -100,6 +100,29 @@ def calculate_volume_spike(self, volumes, window=10):
     current_vol = volumes[-1]
     return current_vol > avg_vol * 1.8
 
+def validate_api_keys(self):
+    """Validate all API keys at startup"""
+    issues = []
+    
+    if not self.binance_api_key or self.binance_api_key == "your_binance_api_key_here":
+        issues.append("Binance API Key not configured")
+    
+    if not self.binance_secret or self.binance_secret == "your_binance_secret_key_here":
+        issues.append("Binance Secret Key not configured")
+        
+    if not self.openrouter_key or self.openrouter_key == "your_openrouter_api_key_here":
+        issues.append("OpenRouter API Key not configured - AI will use fallback decisions")
+    
+    if issues:
+        self.print_color("🚨 CONFIGURATION ISSUES FOUND:", self.Fore.RED + self.Style.BRIGHT)
+        for issue in issues:
+            self.print_color(f"   ❌ {issue}", self.Fore.RED)
+        
+        if "OpenRouter" in str(issues):
+            self.print_color("   💡 Without OpenRouter, AI will use technical analysis fallback only", self.Fore.YELLOW)
+    
+    return len(issues) == 0
+
 # Common trading initialization for both cases
 def _initialize_trading(self):
     """Initialize trading components (common for both cases)"""
@@ -149,6 +172,9 @@ def _initialize_trading(self):
     
     # NEW: Monitoring interval (3 minute)
     self.monitoring_interval = 180  # 3 minute in seconds
+    
+    # Validate APIs before starting
+    self.validate_api_keys()
     
     # Initialize Binance client
     try:
@@ -310,53 +336,58 @@ def get_market_news_sentiment(self):
 
 def get_ai_trading_decision(self, pair, market_data, current_trade=None):
     """AI makes COMPLETE trading decisions including REVERSE positions"""
-    try:
-        if not self.openrouter_key:
-            return self.get_fallback_decision(pair, market_data)
-        
-        current_price = market_data.get('current_price', 0)
-        mtf = market_data.get('mtf_analysis', {})
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            if not self.openrouter_key:
+                self.print_color("❌ OpenRouter API key missing!", self.Fore.RED)
+                return self.get_improved_fallback_decision(pair, market_data)
+            
+            current_price = market_data.get('current_price', 0)
+            mtf = market_data.get('mtf_analysis', {})
 
-        # === MULTI-TIMEFRAME TEXT SUMMARY ===
-        mtf_text = "MULTI-TIMEFRAME ANALYSIS:\n"
-        for tf in ['5m', '15m', '1h', '4h', '1d']:
-            if tf in mtf:
-                d = mtf[tf]
-                mtf_text += f"- {tf.upper()}: {d.get('trend', 'N/A')} | "
-                if 'crossover' in d:
-                    mtf_text += f"Signal: {d['crossover']} | "
-                if 'rsi' in d:
-                    mtf_text += f"RSI: {d['rsi']} | "
-                if 'vol_spike' in d:
-                    mtf_text += f"Vol: {'SPIKE' if d['vol_spike'] else 'Normal'} | "
-                if 'support' in d and 'resistance' in d:
-                    mtf_text += f"S/R: {d['support']:.4f}/{d['resistance']:.4f}"
-                mtf_text += "\n"
+            # === MULTI-TIMEFRAME TEXT SUMMARY ===
+            mtf_text = "MULTI-TIMEFRAME ANALYSIS:\n"
+            for tf in ['5m', '15m', '1h', '4h', '1d']:
+                if tf in mtf:
+                    d = mtf[tf]
+                    mtf_text += f"- {tf.upper()}: {d.get('trend', 'N/A')} | "
+                    if 'crossover' in d:
+                        mtf_text += f"Signal: {d['crossover']} | "
+                    if 'rsi' in d:
+                        mtf_text += f"RSI: {d['rsi']} | "
+                    if 'vol_spike' in d:
+                        mtf_text += f"Vol: {'SPIKE' if d['vol_spike'] else 'Normal'} | "
+                    if 'support' in d and 'resistance' in d:
+                        mtf_text += f"S/R: {d['support']:.4f}/{d['resistance']:.4f}"
+                    mtf_text += "\n"
 
-        # === TREND ALIGNMENT ===
-        h1_trend = mtf.get('1h', {}).get('trend')
-        h4_trend = mtf.get('4h', {}).get('trend')
-        alignment = "STRONG" if h1_trend == h4_trend and h1_trend else "WEAK"
+            # === TREND ALIGNMENT ===
+            h1_trend = mtf.get('1h', {}).get('trend')
+            h4_trend = mtf.get('4h', {}).get('trend')
+            alignment = "STRONG" if h1_trend == h4_trend and h1_trend else "WEAK"
 
-        # === REVERSE ANALYSIS ===
-        reverse_analysis = ""
-        if current_trade and self.allow_reverse_positions:
-            pnl = self.calculate_current_pnl(current_trade, current_price)
-            reverse_analysis = f"""
-            EXISTING POSITION:
-            - Direction: {current_trade['direction']}
-            - Entry: ${current_trade['entry_price']:.4f}
-            - PnL: {pnl:.2f}%
-            - REVERSE if trend flipped?
-            """
+            # === REVERSE ANALYSIS ===
+            reverse_analysis = ""
+            if current_trade and self.allow_reverse_positions:
+                pnl = self.calculate_current_pnl(current_trade, current_price)
+                reverse_analysis = f"""
+                EXISTING POSITION:
+                - Direction: {current_trade['direction']}
+                - Entry: ${current_trade['entry_price']:.4f}
+                - PnL: {pnl:.2f}%
+                - REVERSE if trend flipped?
+                """
 
-        # === LEARNING CONTEXT ===
-        learning_context = ""
-        if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'get_learning_enhanced_prompt'):
-            learning_context = self.get_learning_enhanced_prompt(pair, market_data)
+            # === LEARNING CONTEXT ===
+            learning_context = ""
+            if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'get_learning_enhanced_prompt'):
+                learning_context = self.get_learning_enhanced_prompt(pair, market_data)
 
-        # === FINAL PROMPT ===
-        prompt = f"""
+            # === FINAL PROMPT ===
+            prompt = f"""
 YOU ARE A PROFESSIONAL AI TRADER. Budget: ${self.available_budget:.2f}
 
 {mtf_text}
@@ -388,8 +419,6 @@ REVERSE POSITION STRATEGY (CRITICAL):
   • 4H: BEARISH → BULLISH, 15m: GOLDEN cross, Volume: SPIKE
   → Return "REVERSE_LONG"
 
-  Return ONLY a valid JSON object. No explanations, no extra text.
-
 Return JSON:
 {{
     "decision": "LONG" | "SHORT" | "HOLD" | "REVERSE_LONG" | "REVERSE_SHORT",
@@ -400,37 +429,122 @@ Return JSON:
     "reasoning": "MTF alignment + signal + risk"
 }}
 """
-        headers = {
-            "Authorization": f"Bearer {self.openrouter_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com",
-            "X-Title": "Fully Autonomous AI Trader"
-        }
-        
-        data = {
-            "model": "deepseek/deepseek-chat-v3.1",
-            "messages": [
-                {"role": "system", "content": "You are a fully autonomous AI trader with reverse position capability. You manually close positions based on market conditions - no TP/SL orders are set. Analyze when to enter AND when to exit based on technical analysis. Monitor every 3 minute."},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.3,
-            "max_tokens": 800
-        }
-        
-        self.print_color(f"🧠 DeepSeek Analyzing {pair} with 3MIN monitoring...", self.Fore.MAGENTA + self.Style.BRIGHT)
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=60)
-        
-        if response.status_code == 200:
-            result = response.json()
-            ai_response = result['choices'][0]['message']['content'].strip()
-            return self.parse_ai_trading_decision(ai_response, pair, current_price, current_trade)
-        else:
-            self.print_color(f"DeepSeek API error: {response.status_code}", self.Fore.RED)
-            return self.get_fallback_decision(pair, market_data)
+            headers = {
+                "Authorization": f"Bearer {self.openrouter_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com",
+                "X-Title": "Fully Autonomous AI Trader"
+            }
             
-    except Exception as e:
-        self.print_color(f"DeepSeek analysis failed: {e}", self.Fore.RED)
-        return self.get_fallback_decision(pair, market_data)
+            data = {
+                "model": "deepseek/deepseek-chat-v3.1",
+                "messages": [
+                    {"role": "system", "content": "You are a fully autonomous AI trader with reverse position capability. You manually close positions based on market conditions - no TP/SL orders are set. Analyze when to enter AND when to exit based on technical analysis. Monitor every 3 minute."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 800
+            }
+            
+            self.print_color(f"🧠 DeepSeek Analyzing {pair} with 3MIN monitoring...", self.Fore.MAGENTA + self.Style.BRIGHT)
+            response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=60)
+            
+            if response.status_code == 200:
+                result = response.json()
+                ai_response = result['choices'][0]['message']['content'].strip()
+                return self.parse_ai_trading_decision(ai_response, pair, current_price, current_trade)
+            else:
+                self.print_color(f"⚠️ DeepSeek API attempt {attempt+1} failed: {response.status_code}", self.Fore.YELLOW)
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
+                    
+        except requests.exceptions.Timeout:
+            self.print_color(f"⏰ DeepSeek timeout attempt {attempt+1}", self.Fore.YELLOW)
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+                
+        except Exception as e:
+            self.print_color(f"❌ DeepSeek error attempt {attempt+1}: {e}", self.Fore.RED)
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+    
+    # All retries failed - use improved fallback
+    self.print_color("🚨 All AI attempts failed, using improved fallback", self.Fore.RED)
+    return self.get_improved_fallback_decision(pair, market_data)
+
+def get_improved_fallback_decision(self, pair, market_data):
+    """Better fallback that analyzes market conditions"""
+    current_price = market_data['current_price']
+    mtf = market_data.get('mtf_analysis', {})
+    
+    # Analyze multiple timeframes
+    h1_data = mtf.get('1h', {})
+    h4_data = mtf.get('4h', {})
+    m15_data = mtf.get('15m', {})
+    
+    # Technical analysis based fallback
+    bullish_signals = 0
+    bearish_signals = 0
+    
+    # Check 1H trend
+    if h1_data.get('trend') == 'BULLISH':
+        bullish_signals += 1
+    elif h1_data.get('trend') == 'BEARISH':
+        bearish_signals += 1
+    
+    # Check 4H trend  
+    if h4_data.get('trend') == 'BULLISH':
+        bullish_signals += 1
+    elif h4_data.get('trend') == 'BEARISH':
+        bearish_signals += 1
+    
+    # Check RSI
+    h1_rsi = h1_data.get('rsi', 50)
+    if h1_rsi < 35:  # Oversold
+        bullish_signals += 1
+    elif h1_rsi > 65:  # Overbought
+        bearish_signals += 1
+    
+    # Check crossover
+    if m15_data.get('crossover') == 'GOLDEN':
+        bullish_signals += 1
+    elif m15_data.get('crossover') == 'DEATH':
+        bearish_signals += 1
+    
+    # Make decision
+    if bullish_signals >= 3 and bearish_signals <= 1:
+        return {
+            "decision": "LONG",
+            "position_size_usd": 20,  # Smaller size for fallback
+            "entry_price": current_price,
+            "leverage": 5,
+            "confidence": 60,
+            "reasoning": f"Fallback: Bullish signals ({bullish_signals}/{bearish_signals}) - Trend + RSI + Crossover",
+            "should_reverse": False
+        }
+    elif bearish_signals >= 3 and bullish_signals <= 1:
+        return {
+            "decision": "SHORT", 
+            "position_size_usd": 20,
+            "entry_price": current_price,
+            "leverage": 5,
+            "confidence": 60,
+            "reasoning": f"Fallback: Bearish signals ({bearish_signals}/{bullish_signals}) - Trend + RSI + Crossover",
+            "should_reverse": False
+        }
+    else:
+        return {
+            "decision": "HOLD",
+            "position_size_usd": 0,
+            "entry_price": current_price,
+            "leverage": 5,
+            "confidence": 40,
+            "reasoning": f"Fallback: Mixed signals ({bullish_signals}/{bearish_signals}) - Waiting for clear direction",
+            "should_reverse": False
+        }
 
 def parse_ai_trading_decision(self, ai_response, pair, current_price, current_trade=None):
     """Parse AI's trading decision including REVERSE positions"""
@@ -465,45 +579,10 @@ def parse_ai_trading_decision(self, ai_response, pair, current_price, current_tr
                 "reasoning": reasoning,
                 "should_reverse": decision.startswith('REVERSE_')
             }
-        return self.get_fallback_decision(pair, {'current_price': current_price})
+        return self.get_improved_fallback_decision(pair, {'current_price': current_price})
     except Exception as e:
         self.print_color(f"DeepSeek response parsing failed: {e}", self.Fore.RED)
-        return self.get_fallback_decision(pair, {'current_price': current_price})
-
-def get_fallback_decision(self, pair, market_data):
-    """Better fallback decision that actually trades"""
-    current_price = market_data['current_price']
-    price_change = market_data.get('price_change', 0)
-    
-    # Simple trend following with some randomness
-    import random
-    if price_change > 1.5 or (abs(price_change) < 0.5 and random.random() < 0.7):
-        decision = "LONG"
-    elif price_change < -1.5 or (abs(price_change) < 0.5 and random.random() < 0.7):
-        decision = "SHORT"
-    else:
-        decision = "HOLD"
-    
-    if decision != "HOLD":
-        return {
-            "decision": decision,
-            "position_size_usd": 25,
-            "entry_price": current_price,
-            "leverage": 5,
-            "confidence": 65,
-            "reasoning": f"Fallback: {decision} based on market conditions",
-            "should_reverse": False
-        }
-    else:
-        return {
-            "decision": "HOLD",
-            "position_size_usd": 0,
-            "entry_price": current_price,
-            "leverage": 5,
-            "confidence": 40,
-            "reasoning": "Fallback: Waiting for better opportunity",
-            "should_reverse": False
-        }
+        return self.get_improved_fallback_decision(pair, {'current_price': current_price})
 
 def calculate_current_pnl(self, trade, current_price):
     """Calculate current PnL percentage"""
@@ -569,8 +648,8 @@ def execute_reverse_position(self, pair, ai_decision, current_trade):
         self.print_color(f"❌ Reverse position execution failed: {e}", self.Fore.RED)
         return False
 
-def close_trade_immediately(self, pair, trade, reason="REVERSE"):
-    """Close trade immediately at market price"""
+def close_trade_immediately(self, pair, trade, close_reason="AI_DECISION"):
+    """Close trade immediately at market price with AI reasoning"""
     try:
         if self.binance:
             # Cancel any existing orders first
@@ -599,18 +678,21 @@ def close_trade_immediately(self, pair, trade, reason="REVERSE"):
             else:
                 pnl = (trade['entry_price'] - current_price) * trade['quantity']
             
-            # Update trade record
+            # 🆕 Update trade record with AI's actual reasoning
             trade['status'] = 'CLOSED'
             trade['exit_price'] = current_price
             trade['pnl'] = pnl
-            trade['close_reason'] = reason
+            trade['close_reason'] = close_reason  # 🆕 Use AI's actual reason
             trade['close_time'] = self.get_thailand_time()
             
             # Return budget
             self.available_budget += trade['position_size_usd'] + pnl
             
             self.add_trade_to_history(trade.copy())
-            self.print_color(f"✅ Position closed for reverse: {pair} | P&L: ${pnl:.2f}", self.Fore.CYAN)
+            
+            # 🆕 Better closing message
+            pnl_color = self.Fore.GREEN if pnl > 0 else self.Fore.RED
+            self.print_color(f"✅ Position closed | {pair} | P&L: ${pnl:.2f} | Reason: {close_reason}", pnl_color)
             
             # Remove from active positions after closing
             if pair in self.ai_opened_trades:
@@ -628,11 +710,15 @@ def close_trade_immediately(self, pair, trade, reason="REVERSE"):
             trade['status'] = 'CLOSED'
             trade['exit_price'] = current_price
             trade['pnl'] = pnl
-            trade['close_reason'] = reason
+            trade['close_reason'] = close_reason  # 🆕 Use AI's actual reason
             trade['close_time'] = self.get_thailand_time()
             
             self.available_budget += trade['position_size_usd'] + pnl
             self.add_trade_to_history(trade.copy())
+            
+            # 🆕 Better closing message
+            pnl_color = self.Fore.GREEN if pnl > 0 else self.Fore.RED
+            self.print_color(f"✅ Position closed | {pair} | P&L: ${pnl:.2f} | Reason: {close_reason}", pnl_color)
             
             # Remove from active positions after closing
             if pair in self.ai_opened_trades:
@@ -952,8 +1038,6 @@ def get_ai_close_decision(self, pair, trade):
         - Market sentiment
         - Risk management
         - Time in trade
-
-        Return ONLY a valid JSON object. No explanations, no extra text.
         
         Return JSON:
         {{
@@ -1010,7 +1094,7 @@ def monitor_positions(self):
             
             # NEW: Ask AI whether to close this position (for positions without TP/SL)
             if not trade.get('has_tp_sl', True):
-                self.print_color(f"🔍 Checking if AI wants to close {pair}...", self.Fore.BLUE)
+                self.print_color(f"🔍 Asking AI whether to close {pair}...", self.Fore.BLUE)
                 close_decision = self.get_ai_close_decision(pair, trade)
                 
                 if close_decision.get("should_close", False):
@@ -1018,16 +1102,23 @@ def monitor_positions(self):
                     confidence = close_decision.get("confidence", 0)
                     reasoning = close_decision.get("reasoning", "No reason provided")
                     
-                    self.print_color(f"🎯 AI Decision: CLOSE {pair} (Confidence: {confidence}%)", self.Fore.YELLOW + self.Style.BRIGHT)
-                    self.print_color(f"📝 Reason: {reasoning}", self.Fore.WHITE)
+                    # 🆕 Use AI's ACTUAL reasoning for closing
+                    full_close_reason = f"AI_CLOSE: {close_reason} - {reasoning}"
                     
-                    success = self.close_trade_immediately(pair, trade, f"AI_CLOSE: {close_reason}")
+                    self.print_color(f"🎯 AI Decision: CLOSE {pair}", self.Fore.YELLOW + self.Style.BRIGHT)
+                    self.print_color(f"📝 AI Reasoning: {reasoning}", self.Fore.WHITE)
+                    self.print_color(f"💡 Confidence: {confidence}% | Close Reason: {close_reason}", self.Fore.CYAN)
+                    
+                    # 🆕 Pass AI's actual reasoning to close function
+                    success = self.close_trade_immediately(pair, trade, full_close_reason)
                     if success:
                         closed_trades.append(pair)
                 else:
-                    # Show AI's decision to hold
+                    # Show AI's decision to hold with reasoning
                     if close_decision.get('confidence', 0) > 0:
+                        reasoning = close_decision.get('reasoning', 'No reason provided')
                         self.print_color(f"🔍 AI wants to HOLD {pair} (Confidence: {close_decision.get('confidence', 0)}%)", self.Fore.GREEN)
+                        self.print_color(f"📝 Hold Reasoning: {reasoning}", self.Fore.WHITE)
                 
         return closed_trades
                 
@@ -1241,14 +1332,15 @@ methods = [
     load_real_trade_history, save_real_trade_history, add_trade_to_history,
     get_thailand_time, print_color, validate_config, setup_futures,
     load_symbol_precision, get_market_news_sentiment, get_ai_trading_decision,
-    parse_ai_trading_decision, get_fallback_decision, calculate_current_pnl,
+    parse_ai_trading_decision, get_improved_fallback_decision, calculate_current_pnl,
     execute_reverse_position, close_trade_immediately, get_price_history,
     get_current_price, calculate_quantity, can_open_new_position,
     get_ai_decision_with_learning, execute_ai_trade, get_ai_close_decision,
     monitor_positions, display_dashboard, show_trade_history, show_trading_stats,
     run_trading_cycle, start_trading, show_advanced_learning_progress,
     # Add MTF indicator methods
-    calculate_ema, calculate_rsi, calculate_volume_spike, _get_mock_mtf_data
+    calculate_ema, calculate_rsi, calculate_volume_spike, _get_mock_mtf_data,
+    validate_api_keys
 ]
 
 for method in methods:
@@ -1382,8 +1474,8 @@ class FullyAutonomous1HourPaperTrader:
             self.real_bot.print_color(f"❌ PAPER: Reverse position execution failed: {e}", self.Fore.RED)
             return False
 
-    def paper_close_trade_immediately(self, pair, trade, reason="REVERSE"):
-        """Close paper trade immediately"""
+    def paper_close_trade_immediately(self, pair, trade, close_reason="AI_DECISION"):
+        """Close paper trade immediately with AI's actual reasoning"""
         try:
             current_price = self.real_bot.get_current_price(pair)
             if trade['direction'] == 'LONG':
@@ -1394,14 +1486,17 @@ class FullyAutonomous1HourPaperTrader:
             trade['status'] = 'CLOSED'
             trade['exit_price'] = current_price
             trade['pnl'] = pnl
-            trade['close_reason'] = reason
+            trade['close_reason'] = close_reason  # 🆕 Use AI's actual reason
             trade['close_time'] = self.real_bot.get_thailand_time()
             
             self.available_budget += trade['position_size_usd'] + pnl
             self.paper_balance = self.available_budget
             
             self.add_paper_trade_to_history(trade.copy())
-            self.real_bot.print_color(f"✅ PAPER: Position closed for reverse: {pair} | P&L: ${pnl:.2f}", self.Fore.CYAN)
+            
+            # 🆕 Better closing message with AI reasoning
+            pnl_color = self.Fore.GREEN if pnl > 0 else self.Fore.RED
+            self.real_bot.print_color(f"✅ PAPER: Position closed | {pair} | P&L: ${pnl:.2f} | Reason: {close_reason}", pnl_color)
             
             # Remove from active positions after closing
             if pair in self.paper_positions:
@@ -1576,7 +1671,7 @@ class FullyAutonomous1HourPaperTrader:
                 
                 # Ask AI whether to close this paper position
                 if not trade.get('has_tp_sl', True):
-                    self.real_bot.print_color(f"🔍 PAPER: Checking if AI wants to close {pair}...", self.Fore.BLUE)
+                    self.real_bot.print_color(f"🔍 PAPER: Asking AI whether to close {pair}...", self.Fore.BLUE)
                     close_decision = self.get_ai_close_decision(pair, trade)
                     
                     if close_decision.get("should_close", False):
@@ -1584,16 +1679,23 @@ class FullyAutonomous1HourPaperTrader:
                         confidence = close_decision.get("confidence", 0)
                         reasoning = close_decision.get("reasoning", "No reason provided")
                         
-                        self.real_bot.print_color(f"🎯 PAPER AI Decision: CLOSE {pair} (Confidence: {confidence}%)", self.Fore.YELLOW + self.Style.BRIGHT)
-                        self.real_bot.print_color(f"📝 Reason: {reasoning}", self.Fore.WHITE)
+                        # 🆕 Use AI's ACTUAL reasoning for closing
+                        full_close_reason = f"AI_CLOSE: {close_reason} - {reasoning}"
                         
-                        success = self.paper_close_trade_immediately(pair, trade, f"AI_CLOSE: {close_reason}")
+                        self.real_bot.print_color(f"🎯 PAPER AI Decision: CLOSE {pair}", self.Fore.YELLOW + self.Style.BRIGHT)
+                        self.real_bot.print_color(f"📝 AI Reasoning: {reasoning}", self.Fore.WHITE)
+                        self.real_bot.print_color(f"💡 Confidence: {confidence}% | Close Reason: {close_reason}", self.Fore.CYAN)
+                        
+                        # 🆕 Pass AI's actual reasoning to close function
+                        success = self.paper_close_trade_immediately(pair, trade, full_close_reason)
                         if success:
                             closed_positions.append(pair)
                     else:
-                        # Show AI's decision to hold
+                        # Show AI's decision to hold with reasoning
                         if close_decision.get('confidence', 0) > 0:
+                            reasoning = close_decision.get('reasoning', 'No reason provided')
                             self.real_bot.print_color(f"🔍 PAPER AI wants to HOLD {pair} (Confidence: {close_decision.get('confidence', 0)}%)", self.Fore.GREEN)
+                            self.real_bot.print_color(f"📝 Hold Reasoning: {reasoning}", self.Fore.WHITE)
                     
             return closed_positions
                     
