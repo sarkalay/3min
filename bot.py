@@ -388,6 +388,8 @@ REVERSE POSITION STRATEGY (CRITICAL):
   • 4H: BEARISH → BULLISH, 15m: GOLDEN cross, Volume: SPIKE
   → Return "REVERSE_LONG"
 
+  Return ONLY a valid JSON object. No explanations, no extra text.
+
 Return JSON:
 {{
     "decision": "LONG" | "SHORT" | "HOLD" | "REVERSE_LONG" | "REVERSE_SHORT",
@@ -950,6 +952,8 @@ def get_ai_close_decision(self, pair, trade):
         - Market sentiment
         - Risk management
         - Time in trade
+
+        Return ONLY a valid JSON object. No explanations, no extra text.
         
         Return JSON:
         {{
