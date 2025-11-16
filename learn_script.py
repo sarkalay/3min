@@ -1,4 +1,4 @@
-# learn_script.py - ADVANCED LEARNING WITH STOP_LOSS & LOSS ANALYSIS
+# learn_script.py - ADVANCED LEARNING WITH STOP_LOSS & LOSS ANALYSIS (UPDATED + DEBUG)
 import os
 import json
 import time
@@ -8,6 +8,16 @@ class SelfLearningAITrader:
     def __init__(self):
         # Mistake history storage
         self.mistakes_history_file = "ai_trading_mistakes.json"
+        
+        # === [NEW] ဖိုင်မရှိရင် အလိုအလျောက် ဖန်တီးပေး ===
+        if not os.path.exists(self.mistakes_history_file):
+            try:
+                with open(self.mistakes_history_file, 'w') as f:
+                    json.dump([], f)
+                print(f"[INIT] Created empty file: {os.path.abspath(self.mistakes_history_file)}")
+            except Exception as e:
+                print(f"[INIT ERROR] Cannot create file: {e}")
+
         self.mistakes_history = self.load_mistakes_history()
         
         # Advanced learning patterns with confidence
@@ -36,6 +46,12 @@ class SelfLearningAITrader:
         }
         
         self.learning_effectiveness_history = []
+        
+        # === [NEW] Init မှာ လက်ရှိ path ပြပေး ===
+        print(f"[INIT] Working directory: {os.getcwd()}")
+        print(f"[INIT] Mistakes file: {os.path.abspath(self.mistakes_history_file)}")
+        print(f"[INIT] File exists: {os.path.exists(self.mistakes_history_file)}")
+        print(f"[INIT] Loaded {len(self.mistakes_history)} past mistakes.\n")
     
     def print_color(self, text, color=""):
         print(text)
@@ -47,18 +63,25 @@ class SelfLearningAITrader:
                     mistakes = json.load(f)
                 cutoff_time = time.time() - (90 * 24 * 60 * 60)
                 recent_mistakes = [m for m in mistakes if m.get('timestamp', 0) > cutoff_time]
+                print(f"[LOAD] Loaded {len(recent_mistakes)} recent mistakes (last 90 days)")
                 return recent_mistakes
-            return []
+            else:
+                print(f"[LOAD] File not found: {self.mistakes_history_file}")
+                return []
         except Exception as e:
-            print(f"Error loading mistakes: {e}")
+            print(f"[LOAD ERROR] Error loading mistakes: {e}")
             return []
     
     def save_mistakes_history(self):
         try:
+            file_path = os.path.abspath(self.mistakes_history_file)
+            print(f"[SAVE] Saving {len(self.mistakes_history)} mistakes to:\n     {file_path}")
             with open(self.mistakes_history_file, 'w') as f:
                 json.dump(self.mistakes_history, f, indent=2)
+            print(f"[SAVE] Successfully saved!\n")
         except Exception as e:
-            print(f"Save error: {e}")
+            print(f"[SAVE ERROR] Failed to save mistakes: {e}")
+            print(f"     Trying to save at: {os.path.abspath(self.mistakes_history_file)}")
 
     # ========================================
     # 1. CORE: ANALYZE WHY A TRADE LOST
@@ -84,7 +107,7 @@ class SelfLearningAITrader:
             avoidance = "Require stronger confirmation"
 
             # 1. STOP_LOSS HIT
-            if "STOP_LOSS" in close_reason:
+            if "STOP_LOSS" in close_reason.upper():  # ← UPPER ထည့်ပြီး သေချာအောင်
                 if direction == "LONG":
                     mistake_type = "LONG stopped out"
                     lesson = f"Avoid LONG when price is near resistance or in downtrend"
@@ -116,16 +139,18 @@ class SelfLearningAITrader:
                 lesson += " | AI was uncertain"
                 avoidance += " | Skip trade if confidence < 70%"
 
-            return {
+            result = {
                 "mistake_type": mistake_type.strip(),
                 "lesson_learned": lesson.strip(),
                 "avoidance_strategy": avoidance.strip(),
                 "trade_data": trade_data,
                 "pnl": pnl
             }
+            print(f"[ANALYSIS] Detected: {result['mistake_type']}")
+            return result
 
         except Exception as e:
-            print(f"Analysis error: {e}")
+            print(f"[ANALYSIS ERROR] Analysis failed: {e}")
             return None
 
     # ========================================
@@ -133,8 +158,10 @@ class SelfLearningAITrader:
     # ========================================
     def learn_from_mistake(self, trade_data):
         try:
+            print(f"\n[LEARNING] Analyzing trade: {trade_data.get('pair')} | {trade_data.get('direction')} | PnL: {trade_data.get('pnl')}")
             mistake_analysis = self.analyze_trade_mistake(trade_data)
             if not mistake_analysis:
+                print("[LEARNING] No mistake detected (profitable or invalid).")
                 return
 
             mistake_analysis['timestamp'] = time.time()
@@ -145,7 +172,7 @@ class SelfLearningAITrader:
             mtype = mistake_analysis['mistake_type']
             self.performance_stats['common_mistakes'][mtype] = self.performance_stats['common_mistakes'].get(mtype, 0) + 1
 
-            self.save_mistakes_history()
+            self.save_mistakes_history()  # ← ဒီမှာ သိမ်းတယ်!
             self.update_learned_patterns(mistake_analysis)
 
             self.measure_learning_effectiveness()
@@ -156,7 +183,7 @@ class SelfLearningAITrader:
             self.print_color(f"Learning Effectiveness: {(self.performance_stats.get('learning_effectiveness', 0.5)*100):.1f}%", "MAGENTA")
 
         except Exception as e:
-            print(f"Learning error: {e}")
+            print(f"[LEARNING ERROR] Learning failed: {e}")
 
     # ========================================
     # 3. UPDATE LEARNED PATTERNS
@@ -203,7 +230,7 @@ class SelfLearningAITrader:
             })
 
         except Exception as e:
-            print(f"Pattern update error: {e}")
+            print(f"[PATTERN ERROR] Pattern update failed: {e}")
 
     # ========================================
     # 4. CALCULATE CONFIDENCE
@@ -256,13 +283,12 @@ class SelfLearningAITrader:
             return False
 
     def matches_mistake_pattern(self, ai_decision, market_data, mistake_type):
-        """Check if current trade matches a known mistake pattern"""
         try:
             direction = ai_decision["decision"]
             reasoning = ai_decision["reasoning"].lower()
             leverage = ai_decision.get("leverage", 1)
 
-            if "stopped out" in mistake_type:
+            if "stopped out" in mistake_type.lower():
                 if "LONG" in mistake_type and direction == "LONG":
                     return True
                 if "SHORT" in mistake_type and direction == "SHORT":
@@ -404,5 +430,33 @@ class SelfLearningAITrader:
                 block_rate = (blocked / max(1, total_trades)) * 100
                 self.print_color(f"\nBLOCKING: {block_rate:.1f}% of trades blocked", "MAGENTA")
 
+                # === [NEW] Final file check ===
+                print(f"\n[FINAL CHECK] Mistakes file exists: {os.path.exists(self.mistakes_history_file)}")
+                if os.path.exists(self.mistakes_history_file):
+                    print(f"     Path: {os.path.abspath(self.mistakes_history_file)}")
+                    print(f"     Total entries: {len(self.mistakes_history)}")
+
         except Exception as e:
-            print(f"Progress error: {e}")
+            print(f"[PROGRESS ERROR] Progress display failed: {e}")
+
+
+# ========================================
+# [TEST] စမ်းသပ်ဖို့ ဥပမာ
+# ========================================
+if __name__ == "__main__":
+    trader = SelfLearningAITrader()
+    
+    # Stop Loss ထိတဲ့ trade ဥပမာ
+    sample_loss = {
+        "pnl": -45.5,
+        "direction": "LONG",
+        "entry_price": 50000,
+        "exit_price": 49550,
+        "close_reason": "STOP_LOSS",
+        "pair": "BTC/USDT",
+        "leverage": 10,
+        "ai_reasoning": "breakout pattern"
+    }
+    
+    trader.learn_from_mistake(sample_loss)
+    trader.show_advanced_learning_progress()
