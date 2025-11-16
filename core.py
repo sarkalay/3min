@@ -42,7 +42,7 @@ if not COLORAMA_AVAILABLE:
     Back = DummyColors()
     Style = DummyColors()
 
-# === CLASS SETUP ===
+# === CLASS DEFINITION ===
 if LEARN_SCRIPT_AVAILABLE:
     class FullyAutonomous1HourAITrader(SelfLearningAITrader):
         def __init__(self):
@@ -85,12 +85,16 @@ def _initialize_trading(self):
     self.quantity_precision = {}
     self.price_precision = {}
     self.allow_reverse_positions = True
-    self.monitoring_interval = 180
+    self.monitoring_interval = 180  # 3 minutes
 
     self.validate_api_keys()
     try:
         self.binance = Client(self.binance_api_key, self.binance_secret)
         self.print_color("FULLY AUTONOMOUS AI TRADER ACTIVATED!", self.Fore.CYAN + self.Style.BRIGHT)
+        self.print_color(f"TOTAL BUDGET: ${self.total_budget}", self.Fore.GREEN + self.Style.BRIGHT)
+        self.print_color("REVERSE POSITION: ENABLED", self.Fore.MAGENTA + self.Style.BRIGHT)
+        self.print_color("NO TP/SL - AI MANUAL CLOSE", self.Fore.YELLOW + self.Style.BRIGHT)
+        self.print_color("MONITORING: 3 MINUTE INTERVAL", self.Fore.RED + self.Style.BRIGHT)
     except Exception as e:
         self.print_color(f"Binance init failed: {e}", self.Fore.RED)
         self.binance = None
@@ -100,4 +104,5 @@ def _initialize_trading(self):
         self.setup_futures()
         self.load_symbol_precision()
 
+# Attach
 FullyAutonomous1HourAITrader._initialize_trading = _initialize_trading
