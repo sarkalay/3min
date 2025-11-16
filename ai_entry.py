@@ -12,10 +12,9 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
 
             current_price = market_data['current_price']
             mtf = market_data.get('mtf_analysis', {})
-            mtf_text = "".join([
-                f"- {tf.upper()}: {d.get('trend')} | RSI: {d.get('rsi')} | Vol: {'SPIKE' if d.get('vol_spike') else 'Normal'}\n"
-                for tf, d in mtf.items()
-            ])
+            mtf_text = ""
+            for tf, d in mtf.items():
+                mtf_text += f"- {tf.upper()}: {d.get('trend')} | RSI: {d.get('rsi')} | Vol: {'SPIKE' if d.get('vol_spike') else 'Normal'} | S/R: {d.get('support',0):.4f}/{d.get('resistance',0):.4f}\n"
 
             h1_trend = mtf.get('1h', {}).get('trend')
             h4_trend = mtf.get('4h', {}).get('trend')
@@ -26,21 +25,26 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
                 pnl = self.calculate_current_pnl(current_trade, current_price)
                 reverse_analysis = f"Current PnL: {pnl:.2f}% | Direction: {current_trade['direction']}"
 
-            learning_context = ""
-            if LEARN_SCRIPT_AVAILABLE and hasattr(self, 'get_learning_enhanced_prompt'):
-                learning_context = self.get_learning_enhanced_prompt(pair, market_data)
-
             prompt = f"""
             YOU ARE A PROFESSIONAL AI TRADER. Budget: ${self.available_budget:.2f}
             {mtf_text}
             TREND ALIGNMENT: {alignment}
             Pair: {pair} | Price: ${current_price:.6f}
             {reverse_analysis}
-            {learning_context}
 
-            RULES: Only trade if 1H+4H align. Confirm with 15m crossover + volume.
-            Position: 5-10% budget. Leverage: 5-10x.
-            REVERSE only if PnL ≤ -2% + trend flip + volume spike.
+            RULES:
+            - Only trade if 1H and 4H trend align
+            - Confirm entry with 15m crossover + volume spike
+            - RSI < 30 = oversold, > 70 = overbought
+            - Position size: 5-10% of budget
+            - Leverage: 5-10x
+            - NO TP/SL
+
+            REVERSE only if:
+            1. PnL ≤ -2%
+            2. 1H+4H trend flipped
+            3. 15m crossover in new direction
+            4. Volume spike
 
             Return JSON:
             {{
@@ -55,7 +59,9 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
 
             headers = {
                 "Authorization": f"Bearer {self.openrouter_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com",
+                "X-Title": "Fully Autonomous AI Trader"
             }
             data = {
                 "model": "deepseek/deepseek-chat-v3.1",
@@ -64,6 +70,7 @@ def get_ai_trading_decision(self, pair, market_data, current_trade=None):
                 "max_tokens": 800
             }
 
+            self.print_color(f"Analyzing {pair}...", self.Fore.MAGENTA + self.Style.BRIGHT)
             response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=60)
             if response.status_code == 200:
                 ai_response = response.json()['choices'][0]['message']['content'].strip()
@@ -89,15 +96,37 @@ def parse_ai_trading_decision(self, ai_response, pair, current_price, current_tr
                 "reasoning": data.get('reasoning', 'AI Analysis'),
                 "should_reverse": decision.startswith('REVERSE_')
             }
-    except: pass
+    except Exception as e:
+        self.print_color(f"Parse failed: {e}", self.Fore.RED)
     return self.get_improved_fallback_decision(pair, {'current_price': current_price})
 
 def get_improved_fallback_decision(self, pair, market_data):
-    # ... (same as before)
-    pass
+    current_price = market_data['current_price']
+    mtf = market_data.get('mtf_analysis', {})
+    h1 = mtf.get('1h', {})
+    h4 = mtf.get('4h', {})
+    m15 = mtf.get('15m', {})
+
+    bullish = 0
+    bearish = 0
+    if h1.get('trend') == 'BULLISH': bullish += 1
+    if h1.get('trend') == 'BEARISH': bearish += 1
+    if h4.get('trend') == 'BULLISH': bullish += 1
+    if h4.get('trend') == 'BEARISH': bearish += 1
+    if h1.get('rsi', 50) < 35: bullish += 1
+    if h1.get('rsi', 50) > 65: bearish += 1
+    if m15.get('crossover') == 'GOLDEN': bullish += 1
+    if m15.get('crossover') == 'DEATH': bearish += 1
+
+    if bullish >= 3 and bearish <= 1:
+        return {"decision": "LONG", "position_size_usd": 20, "entry_price": current_price, "leverage": 5, "confidence": 60, "reasoning": "Fallback Bullish", "should_reverse": False}
+    elif bearish >= 3 and bullish <= 1:
+        return {"decision": "SHORT", "position_size_usd": 20, "entry_price": current_price, "leverage": 5, "confidence": 60, "reasoning": "Fallback Bearish", "should_reverse": False}
+    else:
+        return {"decision": "HOLD", "position_size_usd": 0, "entry_price": current_price, "leverage": 5, "confidence": 40, "reasoning": "Mixed signals", "should_reverse": False}
 
 def execute_ai_trade(self, pair, ai_decision):
-    # ... (same as before)
+    # ... (same as original, no changes needed here)
     pass
 
 def calculate_current_pnl(self, trade, current_price):
