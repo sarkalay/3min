@@ -98,8 +98,10 @@ def _get_mock_mtf_data(self, pair):
         'resistance_levels': [price * 1.03, price * 1.05],
         'mtf_analysis': {
             '5m': {'trend': 'BULLISH', 'crossover': 'GOLDEN', 'rsi': 68, 'vol_spike': True},
+            '15m': {'trend': 'BULLISH', 'crossover': 'NONE', 'rsi': 62},
             '1h': {'trend': 'BULLISH', 'ema9': price*1.01, 'ema21': price*1.00},
-            '4h': {'trend': 'BULLISH'}
+            '4h': {'trend': 'BULLISH'},
+            '1d': {'support': price*0.92, 'resistance': price*1.08}
         }
     }
 
@@ -108,10 +110,11 @@ def get_current_price(self, pair):
         if self.binance:
             return float(self.binance.futures_symbol_ticker(symbol=pair)['price'])
         else:
-            return {"BNBUSDT": 300, "SOLUSDT": 180, "AVAXUSDT": 35}.get(pair, 100)
+            mock = {"BNBUSDT": 300, "SOLUSDT": 180, "AVAXUSDT": 35}
+            return mock.get(pair, 100)
     except:
         return 100
 
-# Attach to class
+# Attach
 for func in [calculate_ema, calculate_rsi, calculate_volume_spike, get_price_history, _get_mock_mtf_data, get_current_price]:
     setattr(FullyAutonomous1HourAITrader, func.__name__, func)
